@@ -83,6 +83,7 @@ object LocaleManager {
             "ru" to "Русский",
             "pt" to "Português",
             "pt-rBR" to "Português (Brasil)",
+            "es" to "Español",
             "zh" to "中文 (简体)",
             "ar" to "العربية",
             "ja" to "日本語",

@@ -219,6 +219,7 @@
     <string name="pref_language_ru">Русский</string>
     <string name="pref_language_ar">العربية</string>
     <string name="pref_language_pt">Português</string>
+    <string name="pref_language_es">Español</string>
     
     <string name="restart_required">Reinício Necessário</string>
     <string name="restart_required_message">A página inicial padrão foi alterada. Reinicie o aplicativo para que a alteração tenha efeito.</string>
