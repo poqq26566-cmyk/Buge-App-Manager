@@ -1,24 +1,29 @@
 package com.buge.appmanager.util
 
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import com.buge.appmanager.R
+import com.buge.appmanager.shizuku.ShizukuManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
+import java.io.File
+import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
 
 object UpdateChecker {
 
     private const val TAG = "UpdateChecker"
     private const val GITHUB_API_URL = "https://api.github.com/repos/BugeStudioTeam/Buge-App-Manager/releases"
-    
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
@@ -37,7 +42,7 @@ object UpdateChecker {
         try {
             val currentVersion = getCurrentVersion(context)
             Log.d(TAG, "Current version: $currentVersion")
-            
+
             val request = Request.Builder()
                 .url(GITHUB_API_URL)
                 .header("User-Agent", "BugeAppManager")
@@ -57,14 +62,14 @@ object UpdateChecker {
                 val release = releasesArray.getJSONObject(i)
                 val isPrerelease = release.optBoolean("prerelease", false)
                 val tagName = release.getString("tag_name")
-                
+
                 val versionNumber = extractVersionNumber(tagName)
                 Log.d(TAG, "Checking release $i: tag=$tagName, version=$versionNumber, prerelease=$isPrerelease")
 
                 if (!isPrerelease && versionNumber != null) {
                     if (isNewerVersion(currentVersion, versionNumber)) {
                         Log.d(TAG, "Newer version found: $tagName")
-                        
+
                         var apkUrl: String? = null
                         val assets = release.optJSONArray("assets")
                         if (assets != null && assets.length() > 0) {
@@ -130,13 +135,13 @@ object UpdateChecker {
         return try {
             val currentParts = current.split(".").map { it.toIntOrNull() ?: 0 }
             val latestParts = latest.split(".").map { it.toIntOrNull() ?: 0 }
-            
+
             val maxLength = maxOf(currentParts.size, latestParts.size)
-            
+
             for (i in 0 until maxLength) {
                 val currentPart = if (i < currentParts.size) currentParts[i] else 0
                 val latestPart = if (i < latestParts.size) latestParts[i] else 0
-                
+
                 if (latestPart > currentPart) return true
                 if (latestPart < currentPart) return false
             }
@@ -148,16 +153,29 @@ object UpdateChecker {
     }
 
     fun showUpdateDialog(context: Context, releaseInfo: ReleaseInfo, onDownload: () -> Unit) {
+        val updateMethod = PreferencesManager.getUpdateMethod(context)
+        val installerName = PreferencesManager.getInstallerName(context)
+
         Handler(Looper.getMainLooper()).post {
             val releaseNotes = if (releaseInfo.body.length > 500) {
                 releaseInfo.body.take(500) + "..."
             } else {
                 releaseInfo.body
             }
-            
+
+            val methodText = if (updateMethod == "silent") {
+                "Silent install (Shizuku)"
+            } else {
+                "Open in browser"
+            }
+
             val message = buildString {
                 appendLine("Version: ${releaseInfo.tagName}")
                 appendLine("Published: ${releaseInfo.publishedAt.substringBefore("T")}")
+                appendLine("Method: $methodText")
+                if (installerName.isNotEmpty()) {
+                    appendLine("Installer: $installerName")
+                }
                 appendLine()
                 appendLine(releaseNotes)
             }
@@ -165,9 +183,43 @@ object UpdateChecker {
             MaterialAlertDialogBuilder(context)
                 .setTitle(R.string.update_available)
                 .setMessage(message)
-                .setPositiveButton(R.string.download) { _, _ -> onDownload.invoke() }
+                .setPositiveButton(R.string.download) { _, _ ->
+                    performUpdateWithConfig(context, releaseInfo)
+                }
                 .setNegativeButton(R.string.cancel, null)
                 .show()
+        }
+    }
+
+    private fun performUpdateWithConfig(context: Context, releaseInfo: ReleaseInfo) {
+        val apkUrl = releaseInfo.apkDownloadUrl
+        if (apkUrl.isNullOrEmpty()) {
+            showErrorDialog(context, "No APK download URL available")
+            return
+        }
+
+        val updateMethod = PreferencesManager.getUpdateMethod(context)
+        val installerName = PreferencesManager.getInstallerName(context)
+
+        when (updateMethod) {
+            "silent" -> {
+                if (!ShizukuManager.isShizukuAvailable() || !ShizukuManager.hasShizukuPermission()) {
+                    showErrorDialog(context, "Shizuku not available. Please check Shizuku authorization.")
+                    return
+                }
+                UpdateHelper.startSilentUpdate(context, apkUrl, installerName)
+            }
+            else -> {
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl))
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(intent)
+                    LogManager.info(context, "Update opened in browser", "URL: $apkUrl")
+                } catch (e: Exception) {
+                    LogManager.error(context, "Failed to open browser", e.message)
+                    showErrorDialog(context, "Cannot open browser: ${e.message}")
+                }
+            }
         }
     }
 

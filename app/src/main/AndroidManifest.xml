@@ -84,6 +84,12 @@
             android:launchMode="singleTop" />
 
         <activity
+            android:name=".UpdateOptionsActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity"
+            android:launchMode="singleTop" />
+
+        <activity
             android:name=".CustomLabelsActivity"
             android:exported="true"
             android:parentActivityName=".MainActivity"

@@ -23,6 +23,7 @@ import com.buge.appmanager.LogViewerActivity
 import com.buge.appmanager.MainActivity
 import com.buge.appmanager.R
 import com.buge.appmanager.RestoreAppsActivity
+import com.buge.appmanager.UpdateOptionsActivity
 import com.buge.appmanager.databinding.FragmentSettingsBinding
 import com.buge.appmanager.shizuku.ShizukuManager
 import com.buge.appmanager.util.FontOverrideHelper
@@ -147,6 +148,9 @@ class SettingsFragment : Fragment() {
                             }
                             item.title == getString(R.string.pref_custom_labels) -> {
                                 startActivity(Intent(requireContext(), CustomLabelsActivity::class.java))
+                            }
+                            item.title == getString(R.string.pref_update_options) -> {
+                                startActivity(Intent(requireContext(), UpdateOptionsActivity::class.java))
                             }
                         }
                     }
@@ -344,6 +348,11 @@ class SettingsFragment : Fragment() {
                 R.drawable.ic_restore
             ),
             SettingItem.Normal(
+                getString(R.string.pref_update_options),
+                getString(R.string.pref_update_options_summary),
+                R.drawable.ic_update
+            ),
+            SettingItem.Normal(
                 getString(R.string.pref_custom_labels),
                 getString(R.string.pref_custom_labels_summary),
                 R.drawable.ic_tag
@@ -515,11 +524,11 @@ class SettingsFragment : Fragment() {
                 PreferencesManager.setThemeMode(requireContext(), mode)
                 AppCompatDelegate.setDefaultNightMode(mode)
                 dialog.dismiss()
-                
+
                 val isEnglish = Locale.getDefault().language == "en"
                 FontOverrideHelper.setEnglishLocaleFlag(isEnglish)
                 fontApplied = false
-                
+
                 requireActivity().recreate()
             }
             .show()
@@ -540,13 +549,13 @@ class SettingsFragment : Fragment() {
                 val selectedCode = codes[which]
                 pendingLanguageCode = selectedCode
                 dialog.dismiss()
-                
+
                 showRestartDialog(
                     title = getString(R.string.restart_required),
                     message = getString(R.string.language_changed_restart)
                 ) {
                     LocaleManager.setLanguage(requireContext(), selectedCode)
-                    
+
                     val isEnglish = when (selectedCode) {
                         "", "en" -> true
                         else -> {
@@ -556,7 +565,7 @@ class SettingsFragment : Fragment() {
                     }
                     FontOverrideHelper.setEnglishLocaleFlag(isEnglish)
                     fontApplied = false
-                    
+
                     restartApp()
                 }
             }
@@ -593,7 +602,7 @@ class SettingsFragment : Fragment() {
                 val oldPage = PreferencesManager.getDefaultPage(requireContext())
                 PreferencesManager.setDefaultPage(requireContext(), page)
                 dialog.dismiss()
-                
+
                 if (oldPage != page) {
                     showRestartDialog(
                         title = getString(R.string.restart_required),

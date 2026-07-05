@@ -17,6 +17,8 @@ object PreferencesManager {
     private const val FAVORITE_APPS_KEY = "favorite_apps"
     private const val AUTO_UPDATE_KEY = "auto_update"
     private const val HIDE_NAV_LABELS_KEY = "hide_nav_labels"
+    private const val INSTALLER_NAME_KEY = "installer_name"
+    private const val UPDATE_METHOD_KEY = "update_method"
 
     private fun getPreferences(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -129,5 +131,21 @@ object PreferencesManager {
 
     fun getHideNavLabels(context: Context): Boolean {
         return getPreferences(context).getBoolean(HIDE_NAV_LABELS_KEY, false)
+    }
+
+    fun setInstallerName(context: Context, name: String) {
+        getPreferences(context).edit().putString(INSTALLER_NAME_KEY, name).apply()
+    }
+
+    fun getInstallerName(context: Context): String {
+        return getPreferences(context).getString(INSTALLER_NAME_KEY, "") ?: ""
+    }
+
+    fun setUpdateMethod(context: Context, method: String) {
+        getPreferences(context).edit().putString(UPDATE_METHOD_KEY, method).apply()
+    }
+
+    fun getUpdateMethod(context: Context): String {
+        return getPreferences(context).getString(UPDATE_METHOD_KEY, "browser") ?: "browser"
     }
 }
