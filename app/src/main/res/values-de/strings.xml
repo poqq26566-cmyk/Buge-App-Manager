@@ -272,5 +272,23 @@
     <string name="label_updated">Label aktualisiert</string>
     <string name="label_deleted">Label gelöscht</string>
     <string name="filter_label">Label：%s</string>
+
+    <!-- Update Options -->
+    <string name="pref_update_options">Update-Optionen</string>
+    <string name="pref_update_options_summary">Download- und Installationsmethode für Updates konfigurieren</string>
+    <string name="title_update_options">Update-Optionen</string>
+    <string name="update_method_browser">Im Browser öffnen</string>
+    <string name="update_method_silent">Stille Installation (Shizuku)</string>
+    <string name="installer_name">Installations-Name</string>
+    <string name="installer_name_hint">Installationsnamen eingeben (z.B. BugeAppManager)</string>
+    <string name="update_downloading">Update wird heruntergeladen…</string>
+    <string name="update_download_failed">Download fehlgeschlagen</string>
+    <string name="update_installing">Update wird installiert…</string>
+    <string name="update_install_success">Update erfolgreich installiert</string>
+    <string name="update_install_failed">Installation fehlgeschlagen</string>
+    <string name="update_already_latest">Sie verwenden bereits die neueste Version</string>
+    <string name="checking_for_update_dialog">Suche nach Updates…</string>
+    <string name="update_download_complete">Download abgeschlossen</string>
+    <string name="save">Speichern</string>
     
 </resources>

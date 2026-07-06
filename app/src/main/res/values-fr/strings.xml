@@ -3,17 +3,20 @@
     <string name="app_name">Gestionnaire d\'applications Buge</string>
     <string name="developer_name">Équipe Buge</string>
 
+    <!-- Navigation -->
     <string name="nav_apps">Applications</string>
     <string name="nav_activities">Activités</string>
     <string name="nav_permissions">Permissions</string>
     <string name="nav_settings">Paramètres</string>
 
+    <!-- Settings Groups -->
     <string name="settings_group_authorization">Autorisation</string>
     <string name="settings_group_appearance">Apparence</string>
     <string name="settings_group_apps">Applications</string>
     <string name="settings_group_advanced">Avancé</string>
     <string name="settings_group_about">À propos</string>
 
+    <!-- Basic Settings -->
     <string name="title_settings">Paramètres</string>
     <string name="pref_theme">Thème</string>
     <string name="pref_theme_light">Clair</string>
@@ -32,10 +35,12 @@
     <string name="setting_saved">Paramètre enregistré</string>
     <string name="pref_auto_update">Mise à jour automatique</string>
 
+    <!-- Apps Settings -->
     <string name="pref_google_services">Services Google</string>
     <string name="pref_google_services_summary">Activer ou désactiver les services mobiles Google</string>
     <string name="pref_google_services_disabled">Services Google non disponibles</string>
 
+    <!-- Log Settings -->
     <string name="pref_logging">Journalisation</string>
     <string name="pref_logging_summary">Enregistrer les opérations et erreurs</string>
     <string name="log_activity_title">Journal des opérations</string>
@@ -47,14 +52,17 @@
     <string name="log_cleared">Journaux effacés</string>
     <string name="log_copied">Journaux copiés</string>
 
+    <!-- Default Page Dialog -->
     <string name="default_page_title">Page de démarrage par défaut</string>
     <string name="default_page_apps">Applications</string>
     <string name="default_page_permissions">Permissions</string>
     <string name="default_page_activities">Activités</string>
     <string name="default_page_settings">Paramètres</string>
 
+    <!-- About Dialog -->
     <string name="about_desc">Gestionnaire d\'applications Buge est un outil puissant avec support Shizuku.</string>
 
+    <!-- About Links -->
     <string name="website">Site Web</string>
     <string name="website_desc">Visitez notre site officiel</string>
     <string name="github">GitHub</string>
@@ -69,16 +77,20 @@
     <string name="close">Fermer</string>
     <string name="open">Ouvrir</string>
 
+    <!-- About Us Activity -->
     <string name="about_us">À propos de nous</string>
     <string name="about_us_title">Équipe Buge Studio</string>
     <string name="about_us_description">Équipe passionnée de développeurs et de designers.</string>
 
+    <!-- GMS Disable Warning -->
     <string name="gms_disable_warning_title">Désactiver les services Google ?</string>
     <string name="gms_disable_warning_message">La désactivation affectera les services Google.</string>
 
+    <!-- System Operation Blocked -->
     <string name="system_op_blocked_title">Opération bloquée</string>
     <string name="system_op_blocked_message">Opérations système actuellement désactivées.</string>
 
+    <!-- Restore -->
     <string name="pref_restore_apps">Restaurer les applications désinstallées</string>
     <string name="pref_restore_apps_summary">Afficher et restaurer les applications système désinstallées</string>
     <string name="title_restore_apps">Restaurer les applications</string>
@@ -88,6 +100,7 @@
     <string name="restore_success">Application restaurée</string>
     <string name="restore_failed">Échec de la restauration</string>
 
+    <!-- Shizuku -->
     <string name="shizuku_title">Autorisation Shizuku</string>
     <string name="shizuku_desc">Shizuku est requis pour gérer les permissions.</string>
     <string name="shizuku_status_ok">Autorisé et en cours</string>
@@ -98,6 +111,7 @@
     <string name="shizuku_not_running">Non en cours</string>
     <string name="shizuku_request_auth">Demander l\'autorisation</string>
 
+    <!-- App List -->
     <string name="title_app_list">Applications installées</string>
     <string name="search_hint">Rechercher…</string>
     <string name="filter_all">Toutes</string>
@@ -113,6 +127,7 @@
     <string name="no_apps_found">Aucune application</string>
     <string name="share_apks">Partager les APK</string>
 
+    <!-- App Detail -->
     <string name="title_app_detail">Détails de l\'application</string>
     <string name="package_name">Nom du paquet</string>
     <string name="version">Version</string>
@@ -139,6 +154,7 @@
     <string name="freeze_app">Geler</string>
     <string name="unfreeze_app">Dégeler</string>
 
+    <!-- App Detail Activity Strings -->
     <string name="removed_from_favorites">Retiré des favoris</string>
     <string name="added_to_favorites">Ajouté aux favoris</string>
     <string name="apk_path_not_found">Chemin APK introuvable</string>
@@ -152,6 +168,7 @@
     <string name="uninstall_confirm">Désinstaller %s ?</string>
     <string name="clear_data_confirm">Effacer toutes les données de %s ?</string>
 
+    <!-- Permissions List -->
     <string name="title_permissions">Gestionnaire de permissions</string>
     <string name="perm_microphone">Microphone</string>
     <string name="perm_camera">Caméra</string>
@@ -174,6 +191,7 @@
     <string name="open_system_settings">Paramètres système</string>
     <string name="perm_write_settings">Modifier les paramètres système</string>
 
+    <!-- Activities -->
     <string name="title_activities">Gestionnaire d\'activités</string>
     <string name="title_activity_detail">Détails de l\'activité</string>
     <string name="search_activity_hint">Rechercher…</string>
@@ -181,6 +199,7 @@
     <string name="back_to_apps">Retour</string>
     <string name="no_activities_found">Aucune activité</string>
 
+    <!-- Common -->
     <string name="confirm">Confirmer</string>
     <string name="cancel">Annuler</string>
     <string name="operation_success">Opération réussie</string>
@@ -190,6 +209,7 @@
     <string name="language_changed_restart">Langue changée. Redémarrez.</string>
     <string name="restart">Redémarrer</string>
 
+    <!-- Language names -->
     <string name="pref_language_en">English</string>
     <string name="pref_language_zh">中文 (Simplified)</string>
     <string name="pref_language_ja">日本語</string>
@@ -199,13 +219,13 @@
     <string name="pref_language_ru">Русский</string>
     <string name="pref_language_ar">العربية</string>
     <string name="pref_language_pt">Português</string>
-    <string name="pref_language_es">Español</string>
-    
+
     <string name="restart_required">Redémarrage requis</string>
     <string name="restart_required_message">Redémarrez pour appliquer les changements.</string>
     <string name="restart_now">Redémarrer</string>
     <string name="later">Plus tard</string>
-    
+
+    <!-- Update Checker -->
     <string name="update_available">Mise à jour disponible</string>
     <string name="download">Télécharger</string>
     <string name="no_update_title">Aucune mise à jour</string>
@@ -216,9 +236,10 @@
     <string name="please_wait">Veuillez patienter…</string>
     <string name="ok">OK</string>
     <string name="ignore">Ignorer</string>
-    
+
+    <!-- Shortcuts -->
     <string name="shortcut_app_manager_long">Ouvrir Buge App Manager</string>
-    
+
     <string name="appearance_settings">Paramètres d\'apparence</string>
     <string name="theme_mode">Mode thème</string>
     <string name="color_theme">Couleur du thème</string>
@@ -250,5 +271,23 @@
     <string name="label_updated">Étiquette mise à jour</string>
     <string name="label_deleted">Étiquette supprimée</string>
     <string name="filter_label">Étiquette：%s</string>
-    
+
+    <!-- Update Options -->
+    <string name="pref_update_options">Options de mise à jour</string>
+    <string name="pref_update_options_summary">Configurer la méthode de téléchargement et d\'installation des mises à jour</string>
+    <string name="title_update_options">Options de mise à jour</string>
+    <string name="update_method_browser">Ouvrir dans le navigateur</string>
+    <string name="update_method_silent">Installation silencieuse (Shizuku)</string>
+    <string name="installer_name">Nom de l\'installateur</string>
+    <string name="installer_name_hint">Entrez le nom de l\'installateur (ex: BugeAppManager)</string>
+    <string name="update_downloading">Téléchargement de la mise à jour…</string>
+    <string name="update_download_failed">Échec du téléchargement</string>
+    <string name="update_installing">Installation de la mise à jour…</string>
+    <string name="update_install_success">Mise à jour installée avec succès</string>
+    <string name="update_install_failed">Échec de l\'installation</string>
+    <string name="update_already_latest">Vous utilisez déjà la dernière version</string>
+    <string name="checking_for_update_dialog">Vérification de la mise à jour…</string>
+    <string name="update_download_complete">Téléchargement terminé</string>
+    <string name="save">Enregistrer</string>
+
 </resources>

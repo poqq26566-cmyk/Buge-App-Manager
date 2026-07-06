@@ -272,5 +272,23 @@
     <string name="label_updated">ラベルを更新しました</string>
     <string name="label_deleted">ラベルを削除しました</string>
     <string name="filter_label">ラベル：%s</string>
+
+    <!-- Update Options -->
+    <string name="pref_update_options">アップデートオプション</string>
+    <string name="pref_update_options_summary">アップデートのダウンロードとインストール方法を設定</string>
+    <string name="title_update_options">アップデートオプション</string>
+    <string name="update_method_browser">ブラウザで開く</string>
+    <string name="update_method_silent">サイレントインストール (Shizuku)</string>
+    <string name="installer_name">インストーラー名</string>
+    <string name="installer_name_hint">インストーラー名を入力（例：BugeAppManager）</string>
+    <string name="update_downloading">アップデートをダウンロード中…</string>
+    <string name="update_download_failed">ダウンロードに失敗しました</string>
+    <string name="update_installing">アップデートをインストール中…</string>
+    <string name="update_install_success">アップデートのインストールに成功しました</string>
+    <string name="update_install_failed">インストールに失敗しました</string>
+    <string name="update_already_latest">既に最新バージョンです</string>
+    <string name="checking_for_update_dialog">アップデートを確認中…</string>
+    <string name="update_download_complete">ダウンロード完了</string>
+    <string name="save">保存</string>
     
 </resources>

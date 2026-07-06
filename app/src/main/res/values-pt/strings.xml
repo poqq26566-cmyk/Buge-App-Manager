@@ -272,5 +272,23 @@
     <string name="label_updated">Etiqueta atualizada</string>
     <string name="label_deleted">Etiqueta eliminada</string>
     <string name="filter_label">Etiqueta：%s</string>
+
+    <!-- Update Options -->
+    <string name="pref_update_options">Opções de atualização</string>
+    <string name="pref_update_options_summary">Configurar método de download e instalação de atualizações</string>
+    <string name="title_update_options">Opções de atualização</string>
+    <string name="update_method_browser">Abrir no navegador</string>
+    <string name="update_method_silent">Instalação silenciosa (Shizuku)</string>
+    <string name="installer_name">Nome do instalador</string>
+    <string name="installer_name_hint">Digite o nome do instalador (ex: BugeAppManager)</string>
+    <string name="update_downloading">A descarregar atualização…</string>
+    <string name="update_download_failed">Falha no download</string>
+    <string name="update_installing">A instalar atualização…</string>
+    <string name="update_install_success">Atualização instalada com sucesso</string>
+    <string name="update_install_failed">Falha na instalação</string>
+    <string name="update_already_latest">Já está a usar a versão mais recente</string>
+    <string name="checking_for_update_dialog">A verificar atualizações…</string>
+    <string name="update_download_complete">Download concluído</string>
+    <string name="save">Guardar</string>
     
 </resources>

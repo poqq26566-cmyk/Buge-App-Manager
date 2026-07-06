@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -174,7 +175,12 @@ class UpdateOptionsActivity : BaseActivity() {
 
     private fun registerDownloadReceiver() {
         val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
-        registerReceiver(downloadReceiver, filter)
+        // Android 14+ requires explicit export flag
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(downloadReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(downloadReceiver, filter)
+        }
     }
 
     private fun checkForUpdate() {
@@ -405,7 +411,7 @@ class UpdateOptionsActivity : BaseActivity() {
                 val tempPath = "/data/local/tmp/update_temp.apk"
 
                 // Step 1: Copy APK to /data/local/tmp/
-                val copyCmd = "cat \"$path\" > $tempPath"
+                val copyCmd = "cat \"$path\" > $tempPath && chmod 644 $tempPath"
                 LogManager.debug(this@UpdateOptionsActivity, "Copying APK to temp", copyCmd)
                 val copyResult = ShizukuManager.executeCommand(copyCmd)
 
@@ -420,8 +426,11 @@ class UpdateOptionsActivity : BaseActivity() {
                     return@withContext
                 }
 
-                // Step 2: Try install with various parameters
-                // pm install -r -d -t --user 0 -i "com.package.name" /path/to/file.apk
+                // Step 2: Verify file exists
+                val verifyResult = ShizukuManager.executeCommand("ls -la $tempPath")
+                LogManager.debug(this@UpdateOptionsActivity, "Temp file verified", "Output: ${verifyResult.output}")
+
+                // Step 3: Install
                 val installCmd = if (installerName.isNotEmpty()) {
                     "pm install -r -d -t --user 0 -i \"$installerName\" $tempPath 2>&1"
                 } else {
@@ -430,14 +439,12 @@ class UpdateOptionsActivity : BaseActivity() {
 
                 LogManager.info(this@UpdateOptionsActivity, "Installing APK", "Command: $installCmd")
 
-                // Execute install with detailed output capture
                 val installResult = ShizukuManager.executeCommand(installCmd)
 
-                // Log full output for debugging
                 val fullOutput = if (installResult.output.isNotEmpty()) installResult.output else installResult.error
                 LogManager.debug(this@UpdateOptionsActivity, "Install output", "Success: ${installResult.success}, Output: $fullOutput")
 
-                // Step 3: Clean up temp file
+                // Step 4: Clean up temp file
                 ShizukuManager.executeCommand("rm -f $tempPath")
 
                 withContext(Dispatchers.Main) {
@@ -451,29 +458,14 @@ class UpdateOptionsActivity : BaseActivity() {
                         apkFile.delete()
                         tempApkFile = null
                     } else {
-                        // Try without -i flag as fallback
-                        if (installerName.isNotEmpty()) {
-                            LogManager.warning(this@UpdateOptionsActivity, "Install with -i failed, retrying without -i")
-                            val retryCmd = "pm install -r -d -t --user 0 $tempPath 2>&1"
-                            val retryResult = ShizukuManager.executeCommand(retryCmd)
-
-                            if (retryResult.success) {
-                                SnackbarHelper.showSnackbar(binding.root, getString(R.string.update_install_success))
-                                LogManager.success(this@UpdateOptionsActivity, "Update installed (fallback)")
-                                apkFile.delete()
-                                tempApkFile = null
-                                return@withContext
-                            }
-
-                            val errorMsg = retryResult.error.ifEmpty {
-                                retryResult.output.ifEmpty { "Unknown error" }
-                            }
-                            SnackbarHelper.showSnackbar(binding.root, "${getString(R.string.update_install_failed)}: $errorMsg")
-                            LogManager.error(this@UpdateOptionsActivity, "Install failed (fallback)", errorMsg)
+                        if (fullOutput.contains("INSTALL_FAILED_UPDATE_INCOMPATIBLE")) {
+                            LogManager.warning(this@UpdateOptionsActivity, "Signature mismatch")
+                            SnackbarHelper.showSnackbar(
+                                binding.root,
+                                "Signature mismatch: Please uninstall the current version first, or use a signed APK with the same keystore."
+                            )
                         } else {
-                            val errorMsg = installResult.error.ifEmpty {
-                                installResult.output.ifEmpty { "Unknown error" }
-                            }
+                            val errorMsg = fullOutput.ifEmpty { "Unknown error" }
                             SnackbarHelper.showSnackbar(binding.root, "${getString(R.string.update_install_failed)}: $errorMsg")
                             LogManager.error(this@UpdateOptionsActivity, "Install failed", errorMsg)
                         }

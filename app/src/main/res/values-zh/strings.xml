@@ -273,4 +273,22 @@
     <string name="label_deleted">标签已删除</string>
     <string name="filter_label">标签：%s</string>
 
+    <!-- Update Options -->
+    <string name="pref_update_options">更新选项</string>
+    <string name="pref_update_options_summary">配置更新下载和安装方式</string>
+    <string name="title_update_options">更新选项</string>
+    <string name="update_method_browser">在浏览器中打开</string>
+    <string name="update_method_silent">静默安装 (Shizuku)</string>
+    <string name="installer_name">安装者名称</string>
+    <string name="installer_name_hint">输入安装者名称（例如 BugeAppManager）</string>
+    <string name="update_downloading">正在下载更新…</string>
+    <string name="update_download_failed">下载失败</string>
+    <string name="update_installing">正在安装更新…</string>
+    <string name="update_install_success">更新安装成功</string>
+    <string name="update_install_failed">安装失败</string>
+    <string name="update_already_latest">您已在最新版本</string>
+    <string name="checking_for_update_dialog">正在检查更新…</string>
+    <string name="update_download_complete">下载完成</string>
+    <string name="save">保存</string>
+
 </resources>

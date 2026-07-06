@@ -272,5 +272,23 @@
     <string name="label_updated">تم تحديث التصنيف</string>
     <string name="label_deleted">تم حذف التصنيف</string>
     <string name="filter_label">التصنيف：%s</string>
+
+    <!-- Update Options -->
+    <string name="pref_update_options">خيارات التحديث</string>
+    <string name="pref_update_options_summary">تكوين طريقة تنزيل وتثبيت التحديثات</string>
+    <string name="title_update_options">خيارات التحديث</string>
+    <string name="update_method_browser">فتح في المتصفح</string>
+    <string name="update_method_silent">تثبيت صامت (Shizuku)</string>
+    <string name="installer_name">اسم المثبت</string>
+    <string name="installer_name_hint">أدخل اسم المثبت (مثال: BugeAppManager)</string>
+    <string name="update_downloading">جاري تنزيل التحديث…</string>
+    <string name="update_download_failed">فشل التنزيل</string>
+    <string name="update_installing">جاري تثبيت التحديث…</string>
+    <string name="update_install_success">تم تثبيت التحديث بنجاح</string>
+    <string name="update_install_failed">فشل التثبيت</string>
+    <string name="update_already_latest">أنت تستخدم بالفعل أحدث إصدار</string>
+    <string name="checking_for_update_dialog">جاري التحقق من التحديث…</string>
+    <string name="update_download_complete">اكتمل التنزيل</string>
+    <string name="save">حفظ</string>
     
 </resources>
