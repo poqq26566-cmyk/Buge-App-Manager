@@ -112,7 +112,7 @@ Follow this step-by-step guide to manage the same permission type across multipl
 
 - 한국어 - ko
 
-[Request to add the languages you need](https://github.com/BugeStudioTeam/Buge-App-Manager/issues)
+[If you'd like to request support for a specific language, please open an issue and let us know](https://github.com/BugeStudioTeam/Buge-App-Manager/issues)
 
 ---
 
