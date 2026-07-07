@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500">
-  <g transform="matrix(1, 0, 0, 1, -169.2677, 12.605042)">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8.404 51.62 649.46 247.899" xmlns:bx="https://boxy-svg.com">
+  <defs>
+    <bx:guide x="674.069" y="4.802" angle="90"/>
+    <bx:guide x="702.882" y="4.802" angle="90"/>
+  </defs>
+  <g transform="matrix(1, 0, 0, 1, -38.415363, -22.208883)">
     <g id="svg8502" transform="matrix(1, 0, 0, 1, 298.319336, 68.427368)">
       <rect style="color: rgb(0, 0, 0); display: inline; overflow: visible; visibility: visible; fill-opacity: 1; fill-rule: nonzero; stroke: rgb(166, 166, 166); stroke-width: 4; stroke-miterlimit: 4; stroke-dasharray: none; stroke-opacity: 1; marker: none; fill: rgb(0, 140, 252);" id="rect3007" width="560" height="164" x="-230.18" y="47.652" rx="20" ry="20"/>
       <text id="text3013" style="color: rgb(0, 0, 0); font-style: normal; font-variant: normal; font-weight: normal; font-stretch: normal; font-size: 12.3952px; line-height: 100%; font-family: &quot;DejaVu Sans&quot;; letter-spacing: 0px; word-spacing: 0px; display: inline; overflow: visible; visibility: visible; fill: rgb(255, 255, 255); fill-opacity: 1; fill-rule: nonzero; stroke: none; stroke-width: 1; marker: none; white-space: pre;" x="-53.229" y="94.657"><tspan y="94.657" x="-53.229" id="tspan3015" style="font-style: normal; font-variant: normal; font-weight: normal; font-stretch: normal; font-size: 34.1px; font-family: &quot;DejaVu Sans&quot;; word-spacing: 0px; stroke-width: 1;">GET IT ON</tspan></text>
