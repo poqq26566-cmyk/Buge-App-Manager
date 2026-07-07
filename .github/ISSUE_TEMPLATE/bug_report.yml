@@ -1,64 +1,129 @@
-name: Bug report
-description: Report a bug of Buge App Manager
-
+name: "Bug Report"
+description: "Report a bug or unexpected behavior in Buge App Manager"
+title: "[Bug]: "
+labels: ["bug"]
+assignees:
+  - BugeStudioTeam
 body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Bug Report
+        Thank you for reporting an issue. Please provide as much detail as possible to help us identify and fix the problem quickly.
+
   - type: checkboxes
     id: requirements
     attributes:
-      label: Requirements
+      label: "Checklist"
+      description: "Please confirm before submitting"
       options:
-        - label: Buge App Manager is downloaded from official channels (GitHub)
+        - label: "Buge App Manager is downloaded from official channels (GitHub Releases or F-Droid)"
+          required: true
+        - label: "I have searched existing Issues and confirmed this is not a duplicate"
+          required: true
+        - label: "I am able to reproduce this issue consistently"
+          required: false
 
   - type: input
     id: version
     attributes:
-      label: Latest Buge App Manager version
+      label: "Latest Buge App Manager version available"
+      description: "Check the latest release version from the repository"
+      placeholder: "Example: 6.49.94"
     validations:
       required: true
 
   - type: input
     id: app_version
     attributes:
-      label: Version in use
+      label: "Your installed version"
+      description: "The version you are currently using (found in app settings > About)"
+      placeholder: "Example: 6.49.94"
     validations:
       required: true
 
   - type: dropdown
     id: mode
     attributes:
-      label: Mode
+      label: "Operation mode"
+      description: "How are you using the app?"
       options:
-        - Shizuku
-        - other
+        - "Shizuku (authorized)"
+        - "Shizuku (unauthorized)"
+        - "Other / Not using Shizuku"
     validations:
       required: true
 
-  - type: input
+  - type: dropdown
     id: android_version
     attributes:
-      label: Android version
+      label: "Android version"
+      description: "The operating system version of your device"
+      options:
+        - "Android 8.0 (API 26)"
+        - "Android 9.0 (API 28)"
+        - "Android 10 (API 29)"
+        - "Android 11 (API 30)"
+        - "Android 12 / 12L (API 31/32)"
+        - "Android 13 (API 33)"
+        - "Android 14 (API 34)"
+        - "Android 15 (API 35)"
+        - "Android 16 (API 36) or higher"
     validations:
       required: true
 
   - type: input
     id: device
     attributes:
-      label: Device
+      label: "Device model"
+      description: "Your phone or tablet model"
+      placeholder: "Example: Google Pixel 7 Pro, Samsung Galaxy S24 Ultra"
     validations:
       required: true
 
   - type: textarea
     id: reproducer
     attributes:
-      label: What did you do
+      label: "Steps to reproduce the bug"
+      description: "Provide clear, step-by-step instructions to reproduce the issue"
+      placeholder: |
+        1. Open Buge App Manager
+        2. Navigate to Permissions tab
+        3. Select Camera permission
+        4. Tap on 'Revoke All' button
+        5. App crashes
+    validations:
+      required: true
 
   - type: textarea
     id: logs
     attributes:
-      label: What happened
-      description: You can upload log and screenshot
+      label: "What actually happened"
+      description: "Describe the unexpected behavior, error messages, or crashes. You can also attach logs or screenshots."
+      placeholder: "Example: The app freezes when trying to revoke permissions from more than 5 apps simultaneously..."
+    validations:
+      required: true
 
   - type: textarea
     id: expected-behaviour
     attributes:
-      label: What do you expect
+      label: "What you expected to happen"
+      description: "Describe what should have happened instead"
+      placeholder: "Example: All selected permissions should be revoked without any crashes or delays..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: "Additional context"
+      description: "Add any other information that might help diagnose the issue"
+      placeholder: "Example: This only happens when using Shizuku in wireless debugging mode. I have 120 user apps installed."
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        Thank you for reporting this issue. The development team will review it as soon as possible. By submitting this report, you agree to abide by the project's [GNU GPL v3.0](https://github.com/BugeStudioTeam/Buge-App-Manager/blob/main/LICENSE) open-source license.
