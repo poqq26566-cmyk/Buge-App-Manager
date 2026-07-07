@@ -1,0 +1,94 @@
+name: "Feature Request"
+description: "Suggest a new feature or improvement for Buge App Manager"
+title: "[Feature Request]: "
+labels: ["enhancement"]
+assignees:
+  - BugeStudioTeam
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Feature Request
+        Thank you for suggesting an improvement for Buge App Manager. Please provide as much detail as possible to help developers understand your needs.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: "Checklist"
+      description: "Please confirm you have completed the following steps before submitting"
+      options:
+        - label: "I have searched existing Issues and confirmed this is not a duplicate"
+          required: true
+        - label: "I am using the latest version of Buge App Manager"
+          required: true
+        - label: "This suggestion is related to or compatible with Shizuku permission features"
+          required: false
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: "Is your feature request related to a problem?"
+      description: "Briefly describe the issue or inconvenience you are experiencing"
+      placeholder: "Example: Managing the same permission across multiple apps requires too many steps..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: "Describe the solution you would like"
+      description: "Clearly and specifically describe the implementation or new feature you envision"
+      placeholder: "Example: I would like to add a 'favorite' permission type feature for quick access..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Alternatives you have considered"
+      description: "Have you considered other approaches to solve this problem? If so, briefly explain"
+      placeholder: "Example: Currently I can use the batch operation feature, but it lists all permissions..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: "Additional context or screenshots"
+      description: "Add any other information that would help developers understand your request, such as mockups, screenshots, or reference apps"
+      placeholder: "You can drag and drop images or paste links here..."
+    validations:
+      required: false
+
+  - type: input
+    id: app-version
+    attributes:
+      label: "App version you are using"
+      description: "You can find the version number in the app's 'About' section"
+      placeholder: "Example: 6.49.94"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: android-version
+    attributes:
+      label: "Your Android version"
+      description: "The operating system version of your device"
+      options:
+        - "Android 8.0 (API 26)"
+        - "Android 9.0 (API 28)"
+        - "Android 10 (API 29)"
+        - "Android 11 (API 30)"
+        - "Android 12 / 12L (API 31/32)"
+        - "Android 13 (API 33)"
+        - "Android 14 (API 34)"
+        - "Android 15 (API 35)"
+        - "Android 16 (API 36) or higher"
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        Thank you again for your valuable suggestion. Project maintainers will review and respond as soon as possible. By submitting this ISSUE, you agree to abide by the project's [GNU GPL v3.0](https://github.com/BugeStudioTeam/Buge-App-Manager/blob/main/LICENSE) open-source license.
