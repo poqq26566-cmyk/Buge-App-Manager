@@ -261,6 +261,12 @@ class AppsFragment : Fragment() {
     private fun setupSearch() {
         if (!isAdded || view == null) return
         binding.searchEditText.addTextChangedListener { text ->
+            // Exit selection mode when search is triggered
+            if (adapter.isInSelectionMode()) {
+                adapter.clearSelection()
+                adapter.setSelectionMode(false)
+                hideBatchActionBar()
+            }
             viewModel.setSearch(text?.toString() ?: "")
         }
     }
