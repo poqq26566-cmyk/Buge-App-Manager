@@ -84,8 +84,6 @@ class MainActivity : BaseActivity() {
         setupNavigation()
         applyHideNavLabels()
 
-        // Register receiver for navigation labels changes
-        // Android 14+ requires explicit export flag
         val filter = IntentFilter("com.buge.appmanager.ACTION_NAV_LABELS_CHANGED")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(navLabelsReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -120,35 +118,54 @@ class MainActivity : BaseActivity() {
 
     private fun isLargeScreen(): Boolean {
         val displayMetrics = resources.displayMetrics
-        val densityDpi = displayMetrics.densityDpi
-        val widthPx = displayMetrics.widthPixels
-        
-        // Use DPI > 480 OR screen width > 600dp (tablet-like)
-        val isHighDpi = densityDpi >= 480
-        val isWideScreen = widthPx > 600 * displayMetrics.density
-        
-        return isHighDpi || isWideScreen
+        val widthDp = displayMetrics.widthPixels / displayMetrics.density
+        return widthDp >= 600
     }
 
     private fun getNavigationRailWidth(): Int {
-        // NavigationRail default width is 72dp on most devices
         return (72 * resources.displayMetrics.density).toInt()
+    }
+
+    private fun isRtl(): Boolean {
+        return resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL
     }
 
     private fun setupNavigation() {
         val useRail = isLargeScreen()
+        val isRtl = isRtl()
         
         if (useRail) {
             // Use NavigationRail
             binding.navRail.visibility = View.VISIBLE
             binding.bottomNav.visibility = View.GONE
             
-            // Add margin to fragment container to make room for nav rail
-            val params = binding.fragmentContainerWrapper.layoutParams as ViewGroup.MarginLayoutParams
-            params.leftMargin = getNavigationRailWidth()
-            binding.fragmentContainerWrapper.layoutParams = params
+            // Set navigation rail gravity based on layout direction
+            if (isRtl) {
+                // In RTL, navigation rail should be on the right
+                binding.navRail.layoutParams = (binding.navRail.layoutParams as ViewGroup.MarginLayoutParams).apply {
+                    (this as ViewGroup.MarginLayoutParams).marginStart = 0
+                }
+                val params = binding.navRail.layoutParams as ViewGroup.MarginLayoutParams
+                params.marginStart = 0
+                binding.navRail.layoutParams = params
+                
+                // Add margin to the right of fragment container
+                val containerParams = binding.fragmentContainerWrapper.layoutParams as ViewGroup.MarginLayoutParams
+                containerParams.rightMargin = getNavigationRailWidth()
+                containerParams.leftMargin = 0
+                binding.fragmentContainerWrapper.layoutParams = containerParams
+            } else {
+                // In LTR, navigation rail should be on the left
+                val params = binding.navRail.layoutParams as ViewGroup.MarginLayoutParams
+                params.marginStart = 0
+                binding.navRail.layoutParams = params
+                
+                val containerParams = binding.fragmentContainerWrapper.layoutParams as ViewGroup.MarginLayoutParams
+                containerParams.leftMargin = getNavigationRailWidth()
+                containerParams.rightMargin = 0
+                binding.fragmentContainerWrapper.layoutParams = containerParams
+            }
             
-            // Copy selected item from bottom nav to rail
             val selectedId = binding.bottomNav.selectedItemId
             if (selectedId != 0) {
                 binding.navRail.selectedItemId = selectedId
@@ -184,12 +201,12 @@ class MainActivity : BaseActivity() {
             binding.navRail.visibility = View.GONE
             binding.bottomNav.visibility = View.VISIBLE
             
-            // Reset fragment container margin
-            val params = binding.fragmentContainerWrapper.layoutParams as ViewGroup.MarginLayoutParams
-            params.leftMargin = 0
-            binding.fragmentContainerWrapper.layoutParams = params
+            // Reset fragment container margins
+            val containerParams = binding.fragmentContainerWrapper.layoutParams as ViewGroup.MarginLayoutParams
+            containerParams.leftMargin = 0
+            containerParams.rightMargin = 0
+            binding.fragmentContainerWrapper.layoutParams = containerParams
             
-            // Copy selected item from rail to bottom nav
             val selectedId = binding.navRail.selectedItemId
             if (selectedId != 0) {
                 binding.bottomNav.selectedItemId = selectedId
