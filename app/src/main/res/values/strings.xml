@@ -154,6 +154,14 @@
     <string name="freeze_app">Freeze App</string>
     <string name="unfreeze_app">Unfreeze App</string>
 
+    <!-- Storage -->
+    <string name="storage_title">Storage</string>
+    <string name="storage_app">App</string>
+    <string name="storage_data">Data</string>
+    <string name="storage_total">Total</string>
+    <string name="storage_unknown">Unknown</string>
+    <string name="installer_app">Installer App</string>
+
     <!-- App Detail Activity Strings -->
     <string name="removed_from_favorites">Removed from favorites</string>
     <string name="added_to_favorites">Added to favorites</string>

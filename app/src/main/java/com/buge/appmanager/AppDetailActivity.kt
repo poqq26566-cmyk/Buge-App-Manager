@@ -12,7 +12,6 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.TextView
-import android.content.pm.PackageManager
 import androidx.activity.viewModels
 import androidx.core.animation.doOnEnd
 import androidx.core.content.ContextCompat
@@ -243,6 +242,7 @@ class AppDetailActivity : BaseActivity() {
             appendLine("Version Code: ${app.versionCode}")
             appendLine("Is System App: ${if (app.isSystemApp) "Yes" else "No"}")
             appendLine("Is Enabled: ${if (app.isEnabled) "Yes" else "No"}")
+            appendLine("Installer: ${app.installerPackageName ?: "Unknown"}")
             appendLine()
 
             appendLine(line)
@@ -364,7 +364,7 @@ class AppDetailActivity : BaseActivity() {
         }
     }
 
-    // ===================== Export APK (Split APK -> .apks) =====================
+    // ===================== Export APK =====================
 
     private fun exportApk() {
         try {
@@ -396,7 +396,6 @@ class AppDetailActivity : BaseActivity() {
             if (isSplit) {
                 exportAsApks(packageName, safeAppName, timestamp, downloadDir)
             } else {
-                // Single APK - export as .apk
                 val sourceFile = File(sourcePath)
                 if (!sourceFile.exists()) {
                     Snackbar.make(binding.root, "APK file does not exist", Snackbar.LENGTH_SHORT).show()
@@ -428,17 +427,13 @@ class AppDetailActivity : BaseActivity() {
         }
     }
 
-    // ===================== Split APK Detection =====================
-
     private fun isSplitApk(packageName: String): Boolean {
         return try {
             val appInfo = packageManager.getApplicationInfo(packageName, 0)
-            // Android 8.0+ has splitNames directly
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val splitNames = appInfo.splitNames
                 splitNames != null && splitNames.isNotEmpty()
             } else {
-                // Fallback using reflection for older Android versions
                 val splitNamesField = appInfo.javaClass.getDeclaredField("splitNames")
                 splitNamesField.isAccessible = true
                 val splitNames = splitNamesField.get(appInfo) as? Array<String>
@@ -450,13 +445,9 @@ class AppDetailActivity : BaseActivity() {
         }
     }
 
-    /**
-     * Export split APKs as a single .apks archive (ZIP containing all splits with original names)
-     */
     private fun exportAsApks(packageName: String, safeAppName: String, timestamp: String, downloadDir: File) {
         lifecycleScope.launch {
             try {
-                // Get all APK paths using pm path
                 val result = ShizukuManager.executeCommand("pm path $packageName")
                 if (!result.success) {
                     Snackbar.make(binding.root, "Failed to get APK paths: ${result.error}", Snackbar.LENGTH_LONG).show()
@@ -474,7 +465,6 @@ class AppDetailActivity : BaseActivity() {
                     return@launch
                 }
 
-                // Create .apks file (ZIP archive)
                 var apksFile = File(downloadDir, "${safeAppName}_${timestamp}.apks")
                 var counter = 1
                 while (apksFile.exists()) {
@@ -483,7 +473,6 @@ class AppDetailActivity : BaseActivity() {
                 }
 
                 ZipOutputStream(FileOutputStream(apksFile)).use { zos ->
-                    // Add each split APK with its original filename
                     for (path in apkPaths) {
                         val sourceFile = File(path)
                         if (!sourceFile.exists()) {
@@ -491,7 +480,6 @@ class AppDetailActivity : BaseActivity() {
                             continue
                         }
 
-                        // Use original filename from path (e.g., base.apk, split_config.armeabi_v7a.apk)
                         val originalFileName = sourceFile.name
                         val entry = ZipEntry(originalFileName)
                         zos.putNextEntry(entry)
@@ -517,19 +505,6 @@ class AppDetailActivity : BaseActivity() {
                 Snackbar.make(binding.root, "Export failed: ${e.message}", Snackbar.LENGTH_LONG).show()
             }
         }
-    }
-
-    private fun buildManifestJson(apkPaths: List<String>): String {
-        val splits = apkPaths.mapIndexed { index, _ ->
-            if (index == 0) "base" else "split_$index"
-        }
-        return """
-            {
-              "package": "$packageName",
-              "versionCode": 1,
-              "splits": ${splits.joinToString(separator = ", ", prefix = "[", postfix = "]") { "\"$it\"" }}
-            }
-        """.trimIndent()
     }
 
     // ===================== Share APK =====================
@@ -611,7 +586,6 @@ class AppDetailActivity : BaseActivity() {
             startActivity(chooserIntent)
             LogManager.success(this, "APK shared", "Package: $packageName")
 
-            // If split APK, notify user
             if (isSplit) {
                 Snackbar.make(binding.root, "Note: This app uses split APK. Only base APK shared.", Snackbar.LENGTH_LONG).show()
             }
@@ -933,6 +907,19 @@ class AppDetailActivity : BaseActivity() {
         binding.permissionsRecycler.adapter = permAdapter
     }
 
+    // ===================== Storage Helper =====================
+
+    private fun formatFileSize(size: Long): String {
+        return when {
+            size < 1024 -> "$size B"
+            size < 1024 * 1024 -> String.format("%.2f KB", size / 1024.0)
+            size < 1024 * 1024 * 1024 -> String.format("%.2f MB", size / (1024.0 * 1024.0))
+            else -> String.format("%.2f GB", size / (1024.0 * 1024.0 * 1024.0))
+        }
+    }
+
+    // ===================== Observe ViewModel =====================
+
     private fun observeViewModel() {
         viewModel.appInfo.observe(this) { app ->
             app ?: return@observe
@@ -964,6 +951,20 @@ class AppDetailActivity : BaseActivity() {
             addInfoRow(getString(R.string.target_sdk), "API ${app.targetSdkVersion}")
             addInfoRow(getString(R.string.min_sdk), "API ${app.minSdkVersion}")
             addInfoRow(getString(R.string.package_name), app.packageName)
+
+            // Add storage info (app size + data size)
+            val storageInfo = viewModel.storageInfo.value
+            if (storageInfo != null) {
+                addInfoRow(getString(R.string.storage_app), formatFileSize(storageInfo.totalSize))
+            } else {
+                addInfoRow(getString(R.string.storage_app), getString(R.string.storage_unknown))
+            }
+
+            // Add installer info
+            val installer = viewModel.installerAppName.value
+            if (!installer.isNullOrEmpty()) {
+                addInfoRow(getString(R.string.installer_app), installer)
+            }
         }
 
         viewModel.permissions.observe(this) { perms ->
@@ -992,6 +993,63 @@ class AppDetailActivity : BaseActivity() {
             viewModel.clearOperationResult()
             if (!result.success) {
                 LogManager.error(this, "Operation failed", msg)
+            }
+        }
+
+        viewModel.storageInfo.observe(this) { storageInfo ->
+            // Storage info is now displayed in the app info list via appInfo observer
+            // This observer triggers a refresh of the app info to show storage data
+            viewModel.appInfo.value?.let { app ->
+                // The appInfo observer will handle updating the UI
+                // Force a refresh by re-observing the same data
+                val currentApp = viewModel.appInfo.value
+                if (currentApp != null) {
+                    // Update the info rows with storage data
+                    binding.infoContainer.removeAllViews()
+                    val currentLocale = getCurrentLocale()
+                    val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", currentLocale)
+                    addInfoRow(getString(R.string.install_date), dateFormat.format(Date(currentApp.installTime)))
+                    addInfoRow(getString(R.string.update_date), dateFormat.format(Date(currentApp.updateTime)))
+                    addInfoRow(getString(R.string.target_sdk), "API ${currentApp.targetSdkVersion}")
+                    addInfoRow(getString(R.string.min_sdk), "API ${currentApp.minSdkVersion}")
+                    addInfoRow(getString(R.string.package_name), currentApp.packageName)
+                    if (storageInfo != null) {
+                        addInfoRow(getString(R.string.storage_app), formatFileSize(storageInfo.totalSize))
+                    } else {
+                        addInfoRow(getString(R.string.storage_app), getString(R.string.storage_unknown))
+                    }
+                    val installer = viewModel.installerAppName.value
+                    if (!installer.isNullOrEmpty()) {
+                        addInfoRow(getString(R.string.installer_app), installer)
+                    }
+                }
+            }
+        }
+
+        viewModel.installerAppName.observe(this) { installerName ->
+            // Installer info is now displayed in the app info list via appInfo observer
+            // Trigger refresh
+            viewModel.appInfo.value?.let { app ->
+                val currentApp = viewModel.appInfo.value
+                if (currentApp != null) {
+                    binding.infoContainer.removeAllViews()
+                    val currentLocale = getCurrentLocale()
+                    val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", currentLocale)
+                    addInfoRow(getString(R.string.install_date), dateFormat.format(Date(currentApp.installTime)))
+                    addInfoRow(getString(R.string.update_date), dateFormat.format(Date(currentApp.updateTime)))
+                    addInfoRow(getString(R.string.target_sdk), "API ${currentApp.targetSdkVersion}")
+                    addInfoRow(getString(R.string.min_sdk), "API ${currentApp.minSdkVersion}")
+                    addInfoRow(getString(R.string.package_name), currentApp.packageName)
+                    val storageInfo = viewModel.storageInfo.value
+                    if (storageInfo != null) {
+                        addInfoRow(getString(R.string.storage_app), formatFileSize(storageInfo.totalSize))
+                    } else {
+                        addInfoRow(getString(R.string.storage_app), getString(R.string.storage_unknown))
+                    }
+                    if (!installerName.isNullOrEmpty()) {
+                        addInfoRow(getString(R.string.installer_app), installerName)
+                    }
+                }
             }
         }
     }

@@ -15,6 +15,7 @@ data class AppInfo(
     val targetSdkVersion: Int,
     val minSdkVersion: Int,
     val apkPath: String,
+    val installerPackageName: String? = null,
     val permissions: List<PermissionInfo> = emptyList()
 )
 
@@ -30,6 +31,12 @@ data class PermissionCategory(
     val displayName: String,
     val permissions: List<String>,
     val iconResId: Int
+)
+
+data class AppStorageInfo(
+    val appSize: Long,
+    val dataSize: Long,
+    val totalSize: Long
 )
 
 enum class AppFilter {

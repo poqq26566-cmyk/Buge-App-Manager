@@ -1,16 +1,21 @@
 package com.buge.appmanager.viewmodel
 
 import android.app.Application
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.buge.appmanager.data.AppRepository
 import com.buge.appmanager.model.AppInfo
+import com.buge.appmanager.model.AppStorageInfo
 import com.buge.appmanager.model.PermissionInfo
 import com.buge.appmanager.shizuku.ShizukuManager
 import com.buge.appmanager.shizuku.ShizukuResult
+import com.buge.appmanager.util.LogManager
 import kotlinx.coroutines.launch
+import java.io.File
 
 class AppDetailViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -28,6 +33,12 @@ class AppDetailViewModel(application: Application) : AndroidViewModel(applicatio
     private val _operationResult = MutableLiveData<ShizukuResult?>()
     val operationResult: LiveData<ShizukuResult?> = _operationResult
 
+    private val _storageInfo = MutableLiveData<AppStorageInfo?>()
+    val storageInfo: LiveData<AppStorageInfo?> = _storageInfo
+
+    private val _installerAppName = MutableLiveData<String?>()
+    val installerAppName: LiveData<String?> = _installerAppName
+
     private var currentPackageName: String = ""
 
     fun loadApp(packageName: String) {
@@ -39,9 +50,10 @@ class AppDetailViewModel(application: Application) : AndroidViewModel(applicatio
                 val app = apps.find { it.packageName == packageName }
                 _appInfo.value = app
                 if (app != null) {
-                    // getAppPermissions now includes WRITE_SETTINGS and other AppOps permissions
                     val perms = repository.getAppPermissions(packageName)
                     _permissions.value = perms
+                    loadInstallerInfo(packageName)
+                    loadStorageInfo(packageName)
                 }
             } catch (e: Exception) {
                 _appInfo.value = null
@@ -50,6 +62,79 @@ class AppDetailViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
     }
+
+    private suspend fun loadInstallerInfo(packageName: String) {
+        try {
+            val installerName = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                packageManager.getInstallSourceInfo(packageName)?.installingPackageName
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getInstallerPackageName(packageName)
+            }
+            _installerAppName.value = installerName
+        } catch (e: Exception) {
+            _installerAppName.value = null
+            LogManager.warning(getApplication(), "Failed to get installer info", e.message)
+        }
+    }
+
+    private suspend fun loadStorageInfo(packageName: String) {
+        try {
+            var appSize = 0L
+            var dataSize = 0L
+
+            // Get app size from APK file
+            try {
+                val appInfo = packageManager.getApplicationInfo(packageName, 0)
+                val apkFile = File(appInfo.sourceDir)
+                if (apkFile.exists()) {
+                    appSize = apkFile.length()
+                }
+            } catch (e: Exception) {
+                LogManager.warning(getApplication(), "Failed to get APK size", e.message)
+            }
+
+            // Get data size using Shizuku
+            try {
+                val result = ShizukuManager.executeCommand("du -s /data/data/$packageName 2>/dev/null")
+                if (result.success && result.output.isNotEmpty()) {
+                    val sizeKB = result.output.split(Regex("\\s+")).firstOrNull()?.toLongOrNull()
+                    if (sizeKB != null) {
+                        dataSize = sizeKB * 1024
+                    }
+                }
+            } catch (e: Exception) {
+                LogManager.warning(getApplication(), "Failed to get data size via Shizuku", e.message)
+            }
+
+            // Fallback: try to check if data directory exists
+            if (dataSize == 0L) {
+                try {
+                    val result = ShizukuManager.executeCommand("ls -la /data/data/$packageName 2>/dev/null | wc -l")
+                    if (result.success && result.output.isNotEmpty()) {
+                        val lineCount = result.output.trim().toIntOrNull()
+                        if (lineCount != null && lineCount > 1) {
+                            dataSize = 1024L * 1024 // 1MB placeholder
+                        }
+                    }
+                } catch (e: Exception) {
+                    // Ignore
+                }
+            }
+
+            _storageInfo.value = AppStorageInfo(
+                appSize = appSize,
+                dataSize = dataSize,
+                totalSize = appSize + dataSize
+            )
+        } catch (e: Exception) {
+            LogManager.warning(getApplication(), "Failed to load storage info", e.message)
+            _storageInfo.value = null
+        }
+    }
+
+    private val packageManager: PackageManager
+        get() = getApplication<Application>().packageManager
 
     fun togglePermission(permissionName: String, currentlyGranted: Boolean) {
         viewModelScope.launch {
