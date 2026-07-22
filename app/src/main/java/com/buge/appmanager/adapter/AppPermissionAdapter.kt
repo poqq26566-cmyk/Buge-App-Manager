@@ -1,12 +1,10 @@
 package com.buge.appmanager.adapter
 
-import android.animation.Animator
-import android.animation.AnimatorListenerAdapter
-import android.animation.ArgbEvaluator
-import android.animation.ValueAnimator
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.os.Process
 import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
@@ -69,30 +67,148 @@ class AppPermissionAdapter(
         onSelectionChanged(0)
     }
 
-    /**
-     * 直接跳转到该应用的指定权限设置页（如"麦克风权限"页）
-     * 若获取权限组失败则回退到应用详情页
-     */
-    private fun openDirectPermissionSettings(context: Context, packageName: String, permission: String) {
-        try {
-            val permInfo = context.packageManager.getPermissionInfo(permission, 0)
-            val groupName = permInfo.group
+    companion object {
+        /**
+         * 权限 → 权限组名 硬编码映射表
+         * 用于普通运行时权限（有权限组）
+         */
+        private val PERMISSION_GROUP_MAP = mapOf(
+            // 麦克风
+            "android.permission.RECORD_AUDIO" to "android.permission-group.MICROPHONE",
+            // 摄像头
+            "android.permission.CAMERA" to "android.permission-group.CAMERA",
+            // 位置
+            "android.permission.ACCESS_FINE_LOCATION" to "android.permission-group.LOCATION",
+            "android.permission.ACCESS_COARSE_LOCATION" to "android.permission-group.LOCATION",
+            "android.permission.ACCESS_BACKGROUND_LOCATION" to "android.permission-group.LOCATION",
+            // 联系人
+            "android.permission.READ_CONTACTS" to "android.permission-group.CONTACTS",
+            "android.permission.WRITE_CONTACTS" to "android.permission-group.CONTACTS",
+            "android.permission.GET_ACCOUNTS" to "android.permission-group.CONTACTS",
+            // 存储
+            "android.permission.READ_EXTERNAL_STORAGE" to "android.permission-group.STORAGE",
+            "android.permission.WRITE_EXTERNAL_STORAGE" to "android.permission-group.STORAGE",
+            // 媒体（Android 13+）
+            "android.permission.READ_MEDIA_IMAGES" to "android.permission-group.READ_MEDIA_VISUAL",
+            "android.permission.READ_MEDIA_VIDEO" to "android.permission-group.READ_MEDIA_VISUAL",
+            "android.permission.READ_MEDIA_AUDIO" to "android.permission-group.READ_MEDIA_AURAL",
+            // 电话
+            "android.permission.READ_PHONE_STATE" to "android.permission-group.PHONE",
+            "android.permission.CALL_PHONE" to "android.permission-group.PHONE",
+            "android.permission.READ_CALL_LOG" to "android.permission-group.CALL_LOG",
+            "android.permission.WRITE_CALL_LOG" to "android.permission-group.CALL_LOG",
+            "android.permission.ADD_VOICEMAIL" to "android.permission-group.PHONE",
+            "android.permission.USE_SIP" to "android.permission-group.PHONE",
+            "android.permission.PROCESS_OUTGOING_CALLS" to "android.permission-group.PHONE",
+            // 短信
+            "android.permission.SEND_SMS" to "android.permission-group.SMS",
+            "android.permission.RECEIVE_SMS" to "android.permission-group.SMS",
+            "android.permission.READ_SMS" to "android.permission-group.SMS",
+            "android.permission.RECEIVE_WAP_PUSH" to "android.permission-group.SMS",
+            "android.permission.RECEIVE_MMS" to "android.permission-group.SMS",
+            // 日历
+            "android.permission.READ_CALENDAR" to "android.permission-group.CALENDAR",
+            "android.permission.WRITE_CALENDAR" to "android.permission-group.CALENDAR",
+            // 身体传感器
+            "android.permission.BODY_SENSORS" to "android.permission-group.SENSORS",
+            "android.permission.BODY_SENSORS_BACKGROUND" to "android.permission-group.SENSORS",
+            // 活动识别
+            "android.permission.ACTIVITY_RECOGNITION" to "android.permission-group.ACTIVITY_RECOGNITION",
+            // 附近设备
+            "android.permission.BLUETOOTH_SCAN" to "android.permission-group.NEARBY_DEVICES",
+            "android.permission.BLUETOOTH_CONNECT" to "android.permission-group.NEARBY_DEVICES",
+            "android.permission.BLUETOOTH_ADVERTISE" to "android.permission-group.NEARBY_DEVICES",
+            "android.permission.UWB_RANGING" to "android.permission-group.NEARBY_DEVICES",
+            // 通知（Android 13+）
+            "android.permission.POST_NOTIFICATIONS" to "android.permission-group.NOTIFICATIONS"
+        )
+
+        /**
+         * 特殊 AppOps 权限 → 跳转到对应系统设置页
+         * 这类权限没有权限组，需要用专属 Action 跳转
+         */
+        fun openPermissionSettings(context: Context, packageName: String, permission: String) {
+            // 1. 先检查是否是特殊权限，直接用专属 Intent
+            val specialIntent = getSpecialPermissionIntent(context, packageName, permission)
+            if (specialIntent != null) {
+                try {
+                    context.startActivity(specialIntent)
+                    return
+                } catch (_: Exception) { }
+            }
+
+            // 2. 普通运行时权限：通过权限组直接跳到该权限设置页
+            val groupName = PERMISSION_GROUP_MAP[permission]
+                ?: runCatching {
+                    context.packageManager.getPermissionInfo(permission, 0).group
+                }.getOrNull()
+
             if (groupName != null) {
-                val intent = Intent("android.intent.action.MANAGE_APP_PERMISSION").apply {
-                    putExtra(Intent.EXTRA_PACKAGE_NAME, packageName)
-                    putExtra("android.intent.extra.PERMISSION_GROUP_NAME", groupName)
+                try {
+                    val intent = Intent("android.intent.action.MANAGE_APP_PERMISSION").apply {
+                        putExtra(Intent.EXTRA_PACKAGE_NAME, packageName)
+                        putExtra("android.intent.extra.PERMISSION_GROUP_NAME", groupName)
+                        putExtra("android.intent.extra.USER", Process.myUserHandle())
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
+                    return
+                } catch (_: Exception) { }
+            }
+
+            // 3. 兜底：跳应用详情页
+            context.startActivity(
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", packageName, null)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
-                context.startActivity(intent)
-                return
-            }
-        } catch (_: Exception) { }
-        // 回退：跳应用详情页
-        val fallback = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-            data = Uri.fromParts("package", packageName, null)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
         }
-        context.startActivity(fallback)
+
+        /**
+         * 特殊权限直接跳转到对应系统设置页
+         */
+        private fun getSpecialPermissionIntent(context: Context, packageName: String, permission: String): Intent? {
+            return when (permission) {
+                // 悬浮窗
+                "android.permission.SYSTEM_ALERT_WINDOW" ->
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        Intent(
+                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:$packageName")
+                        ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                    } else null
+
+                // 安装未知应用（Android 8+）
+                "android.permission.REQUEST_INSTALL_PACKAGES" ->
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        Intent(
+                            Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                            Uri.parse("package:$packageName")
+                        ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                    } else null
+
+                // 所有文件访问（Android 11+）
+                "android.permission.MANAGE_EXTERNAL_STORAGE" ->
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        Intent(
+                            Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                            Uri.parse("package:$packageName")
+                        ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                    } else null
+
+                // 修改系统设置
+                "android.permission.WRITE_SETTINGS" ->
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        Intent(
+                            Settings.ACTION_MANAGE_WRITE_SETTINGS,
+                            Uri.parse("package:$packageName")
+                        ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                    } else null
+
+                else -> null
+            }
+        }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -129,7 +245,7 @@ class AppPermissionAdapter(
             true
         }
 
-        // 点击行：选择模式下勾选；普通模式下直接跳权限设置页
+        // 点击行
         holder.itemView.setOnClickListener(null)
         holder.itemView.setOnClickListener {
             holder.animateClick()
@@ -143,7 +259,7 @@ class AppPermissionAdapter(
                 onSelectionChanged(count)
                 notifyItemChanged(holder.adapterPosition, "selection")
             } else {
-                openDirectPermissionSettings(
+                openPermissionSettings(
                     holder.itemView.context,
                     item.app.packageName,
                     item.primaryPermission
@@ -151,7 +267,7 @@ class AppPermissionAdapter(
             }
         }
 
-        // Checkbox 点击
+        // Checkbox
         holder.checkbox.setOnClickListener(null)
         holder.checkbox.setOnClickListener {
             holder.animateCheckboxClick()
@@ -164,11 +280,11 @@ class AppPermissionAdapter(
             notifyItemChanged(holder.adapterPosition, "selection")
         }
 
-        // Chip 点击 → 直接跳该权限设置页
+        // Chip 点击 → 直接跳该权限专属设置页
         holder.permStatusChip.setOnClickListener(null)
         holder.permStatusChip.setOnClickListener {
             val item = getItem(holder.adapterPosition)
-            openDirectPermissionSettings(
+            openPermissionSettings(
                 holder.itemView.context,
                 item.app.packageName,
                 item.primaryPermission
@@ -178,12 +294,10 @@ class AppPermissionAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int, payloads: MutableList<Any>) {
         val item = getItem(position)
-        if (payloads.contains("selection_mode")) {
-            holder.updateSelectionMode(selectionMode, item.isSelected)
-        } else if (payloads.contains("selection")) {
-            holder.updateSelection(item.isSelected)
-        } else {
-            super.onBindViewHolder(holder, position, payloads)
+        when {
+            payloads.contains("selection_mode") -> holder.updateSelectionMode(selectionMode, item.isSelected)
+            payloads.contains("selection") -> holder.updateSelection(item.isSelected)
+            else -> super.onBindViewHolder(holder, position, payloads)
         }
     }
 
@@ -201,7 +315,6 @@ class AppPermissionAdapter(
             appIcon.setImageDrawable(item.app.icon)
             appName.text = item.app.appName
             packageName.text = item.app.packageName
-
             systemAppBadge.visibility = if (item.app.isSystemApp) View.VISIBLE else View.GONE
 
             if (selectionMode) {
