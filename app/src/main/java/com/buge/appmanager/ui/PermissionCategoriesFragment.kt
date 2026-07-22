@@ -19,94 +19,95 @@ import com.google.android.material.imageview.ShapeableImageView
 
 class PermissionCategoriesFragment : Fragment() {
 
-    private var _binding: android.view.View? = null
+    private var _binding: View? = null
     private val binding get() = _binding!!
     private var fontApplied = false
 
+    // 使用 PermissionCategory 数据类，注意参数名是 iconResId
     private val categories = listOf(
         PermissionCategory(
             id = "mic",
             displayName = "麦克风",
-            iconRes = R.drawable.ic_mic,
-            permissions = AppRepository.PERMISSION_MICROPHONE
+            permissions = AppRepository.PERMISSION_MICROPHONE,
+            iconResId = R.drawable.ic_mic
         ),
         PermissionCategory(
             id = "camera",
             displayName = "摄像头",
-            iconRes = R.drawable.ic_camera,
-            permissions = AppRepository.PERMISSION_CAMERA
+            permissions = AppRepository.PERMISSION_CAMERA,
+            iconResId = R.drawable.ic_camera
         ),
         PermissionCategory(
             id = "location",
             displayName = "位置",
-            iconRes = R.drawable.ic_location,
-            permissions = AppRepository.PERMISSION_LOCATION
+            permissions = AppRepository.PERMISSION_LOCATION,
+            iconResId = R.drawable.ic_location
         ),
         PermissionCategory(
             id = "contacts",
             displayName = "联系人",
-            iconRes = R.drawable.ic_contacts,
-            permissions = AppRepository.PERMISSION_CONTACTS
+            permissions = AppRepository.PERMISSION_CONTACTS,
+            iconResId = R.drawable.ic_contacts
         ),
         PermissionCategory(
             id = "storage",
             displayName = "存储",
-            iconRes = R.drawable.ic_storage,
-            permissions = AppRepository.PERMISSION_STORAGE
+            permissions = AppRepository.PERMISSION_STORAGE,
+            iconResId = R.drawable.ic_storage
         ),
         PermissionCategory(
             id = "manage_storage",
             displayName = "所有文件访问",
-            iconRes = R.drawable.ic_storage,
-            permissions = AppRepository.PERMISSION_MANAGE_STORAGE
+            permissions = AppRepository.PERMISSION_MANAGE_STORAGE,
+            iconResId = R.drawable.ic_storage
         ),
         PermissionCategory(
             id = "phone",
             displayName = "电话",
-            iconRes = R.drawable.ic_phone,
-            permissions = AppRepository.PERMISSION_PHONE
+            permissions = AppRepository.PERMISSION_PHONE,
+            iconResId = R.drawable.ic_phone
         ),
         PermissionCategory(
             id = "sms",
             displayName = "短信",
-            iconRes = R.drawable.ic_sms,
-            permissions = AppRepository.PERMISSION_SMS
+            permissions = AppRepository.PERMISSION_SMS,
+            iconResId = R.drawable.ic_sms
         ),
         PermissionCategory(
             id = "calendar",
             displayName = "日历",
-            iconRes = R.drawable.ic_calendar,
-            permissions = AppRepository.PERMISSION_CALENDAR
+            permissions = AppRepository.PERMISSION_CALENDAR,
+            iconResId = R.drawable.ic_calendar
         ),
         PermissionCategory(
             id = "sensors",
             displayName = "身体传感器",
-            iconRes = R.drawable.ic_sensors,
-            permissions = AppRepository.PERMISSION_SENSORS
+            permissions = AppRepository.PERMISSION_SENSORS,
+            iconResId = R.drawable.ic_sensors
         ),
         PermissionCategory(
             id = "notifications",
             displayName = "通知",
-            iconRes = R.drawable.ic_notifications,
-            permissions = AppRepository.PERMISSION_NOTIFICATIONS
+            permissions = AppRepository.PERMISSION_NOTIFICATIONS,
+            iconResId = R.drawable.ic_notifications
         ),
         PermissionCategory(
             id = "overlay",
             displayName = "悬浮窗",
-            iconRes = R.drawable.ic_overlay,
-            permissions = AppRepository.PERMISSION_OVERLAY
+            permissions = AppRepository.PERMISSION_OVERLAY,
+            iconResId = R.drawable.ic_overlay
         ),
         PermissionCategory(
             id = "install_unknown",
             displayName = "安装未知应用",
-            iconRes = R.drawable.ic_install_unknown,
-            permissions = AppRepository.PERMISSION_INSTALL_UNKNOWN_APPS
+            permissions = AppRepository.PERMISSION_INSTALL_UNKNOWN_APPS,
+            iconResId = R.drawable.ic_install_unknown
         ),
         PermissionCategory(
             id = "write_settings",
             displayName = "修改系统设置",
-            iconRes = R.drawable.ic_settings,
-            permissions = listOf("android.permission.WRITE_SETTINGS")
+            permissions = listOf("android.permission.WRITE_SETTINGS"),
+            iconResId = R.drawable.ic_settings
         )
     )
 
@@ -162,11 +163,12 @@ class PermissionCategoriesFragment : Fragment() {
     private fun navigateToPermissionDetail(category: PermissionCategory) {
         LogManager.info(requireContext(), "Navigating to permission detail", "Category: ${category.displayName}")
         
+        // 使用 MainActivity 的导航方法，或者直接使用 Fragment 事务
         val detailFragment = PermissionDetailFragment().apply {
             arguments = Bundle().apply {
                 putStringArrayList("permissions", ArrayList(category.permissions))
                 putString("categoryName", category.displayName)
-                putInt("categoryIcon", category.iconRes)
+                putInt("categoryIcon", category.iconResId)
             }
         }
 
@@ -208,10 +210,9 @@ class PermissionCategoriesFragment : Fragment() {
         inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
             private val icon: ShapeableImageView = itemView.findViewById(R.id.category_icon)
             private val name: TextView = itemView.findViewById(R.id.category_name)
-            private val arrow: View = itemView.findViewById(R.id.arrow_forward)
 
             fun bind(category: PermissionCategory) {
-                icon.setImageResource(category.iconRes)
+                icon.setImageResource(category.iconResId)
                 name.text = category.displayName
             }
         }
