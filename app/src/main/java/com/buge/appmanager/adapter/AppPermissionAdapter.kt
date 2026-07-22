@@ -4,6 +4,9 @@ import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ArgbEvaluator
 import android.animation.ValueAnimator
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -29,7 +32,6 @@ data class AppPermissionItem(
 )
 
 class AppPermissionAdapter(
-    private val onPermissionToggle: (AppInfo, String, Boolean) -> Unit,
     private val onSelectionChanged: (Int) -> Unit
 ) : ListAdapter<AppPermissionItem, AppPermissionAdapter.ViewHolder>(DiffCallback()) {
 
@@ -78,11 +80,11 @@ class AppPermissionAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         holder.bind(getItem(position))
-        
+
         // Set corner radius based on position
         val container = holder.itemView.findViewById<FrameLayout>(R.id.item_container)
         val size = currentList.size
-        
+
         val background = when {
             size == 1 -> R.drawable.bg_setting_item_single
             position == 0 -> R.drawable.bg_setting_item_top
@@ -90,7 +92,7 @@ class AppPermissionAdapter(
             else -> R.drawable.bg_setting_item_middle
         }
         container.setBackgroundResource(background)
-        
+
         // CRITICAL: Re-set long click listener every time to ensure it works
         holder.itemView.setOnLongClickListener(null)
         holder.itemView.setOnLongClickListener {
@@ -105,8 +107,8 @@ class AppPermissionAdapter(
             }
             true
         }
-        
-        // Re-set click listener
+
+        // Re-set click listener — 非选择模式下点击整行跳转系统设置
         holder.itemView.setOnClickListener(null)
         holder.itemView.setOnClickListener {
             holder.animateClick()
@@ -119,9 +121,17 @@ class AppPermissionAdapter(
                 val count = currentList.count { it.isSelected }
                 onSelectionChanged(count)
                 notifyItemChanged(holder.adapterPosition, "selection")
+            } else {
+                // 跳转系统应用权限设置页
+                val item = getItem(holder.adapterPosition)
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", item.app.packageName, null)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                holder.itemView.context.startActivity(intent)
             }
         }
-        
+
         // Re-set checkbox listener
         holder.checkbox.setOnClickListener(null)
         holder.checkbox.setOnClickListener {
@@ -134,13 +144,16 @@ class AppPermissionAdapter(
             onSelectionChanged(count)
             notifyItemChanged(holder.adapterPosition, "selection")
         }
-        
-        // Re-set chip listener
+
+        // chip 点击 → 跳转系统设置
         holder.permStatusChip.setOnClickListener(null)
         holder.permStatusChip.setOnClickListener {
             val item = getItem(holder.adapterPosition)
-            val isGranted = item.permissionMap[item.primaryPermission] ?: false
-            onPermissionToggle(item.app, item.primaryPermission, isGranted)
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", item.app.packageName, null)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            holder.itemView.context.startActivity(intent)
         }
     }
 
@@ -198,7 +211,6 @@ class AppPermissionAdapter(
                 permStatusChip.text = itemView.context.getString(R.string.granted)
                 permStatusChip.setChipBackgroundColorResource(R.color.color_granted_container)
                 permStatusChip.setTextColor(itemView.context.getColor(R.color.color_granted))
-                // Set check icon - size matches text
                 permStatusChip.chipIcon = ContextCompat.getDrawable(itemView.context, R.drawable.ic_check_small)
                 permStatusChip.chipIconTint = ContextCompat.getColorStateList(itemView.context, R.color.color_granted)
                 permStatusChip.chipIconSize = 40f
@@ -207,44 +219,39 @@ class AppPermissionAdapter(
                 permStatusChip.text = itemView.context.getString(R.string.denied)
                 permStatusChip.setChipBackgroundColorResource(R.color.color_denied_container)
                 permStatusChip.setTextColor(itemView.context.getColor(R.color.color_denied))
-                // Set cross icon - size matches text
                 permStatusChip.chipIcon = ContextCompat.getDrawable(itemView.context, R.drawable.ic_close_small)
                 permStatusChip.chipIconTint = ContextCompat.getColorStateList(itemView.context, R.color.color_denied)
                 permStatusChip.chipIconSize = 40f
                 permStatusChip.chipStrokeWidth = 0f
             }
-            // Ensure chip has capsule shape
             permStatusChip.chipCornerRadius = 32f
         }
 
         fun updateSelectionMode(mode: Boolean, isSelected: Boolean) {
             if (mode) {
-                // Enter selection mode
                 checkbox.visibility = View.VISIBLE
                 checkbox.alpha = 0f
                 checkbox.scaleX = 0.5f
                 checkbox.scaleY = 0.5f
-                
-                // Slide content right by 28dp (just enough for checkbox width)
+
                 appIcon.animate()
                     .translationX(28f)
                     .setDuration(200)
                     .setInterpolator(AccelerateDecelerateInterpolator())
                     .start()
-                
+
                 textContainer.animate()
                     .translationX(28f)
                     .setDuration(200)
                     .setInterpolator(AccelerateDecelerateInterpolator())
                     .start()
-                
+
                 packageName.animate()
                     .translationX(28f)
                     .setDuration(200)
                     .setInterpolator(AccelerateDecelerateInterpolator())
                     .start()
-                
-                // Animate checkbox appearing
+
                 checkbox.animate()
                     .alpha(1f)
                     .scaleX(1f)
@@ -253,28 +260,24 @@ class AppPermissionAdapter(
                     .setInterpolator(OvershootInterpolator())
                     .start()
             } else {
-                // Exit selection mode
-                
-                // Slide content back left to original position
                 appIcon.animate()
                     .translationX(0f)
                     .setDuration(200)
                     .setInterpolator(AccelerateDecelerateInterpolator())
                     .start()
-                
+
                 textContainer.animate()
                     .translationX(0f)
                     .setDuration(200)
                     .setInterpolator(AccelerateDecelerateInterpolator())
                     .start()
-                
+
                 packageName.animate()
                     .translationX(0f)
                     .setDuration(200)
                     .setInterpolator(AccelerateDecelerateInterpolator())
                     .start()
-                
-                // Animate checkbox disappearing
+
                 checkbox.animate()
                     .alpha(0f)
                     .scaleX(0.5f)
