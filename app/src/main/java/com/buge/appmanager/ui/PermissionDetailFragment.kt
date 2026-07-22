@@ -13,8 +13,7 @@ import com.buge.appmanager.BaseActivity
 import com.buge.appmanager.R
 import com.buge.appmanager.adapter.AppPermissionAdapter
 import com.buge.appmanager.adapter.AppPermissionItem
-import com.buge.appmanager.data.AppRepository
-import com.buge.appmanager.databinding.FragmentPermissionsBinding
+import com.buge.appmanager.databinding.FragmentPermissionDetailBinding
 import com.buge.appmanager.model.AppInfo
 import com.buge.appmanager.shizuku.ShizukuManager
 import com.buge.appmanager.util.FontOverrideHelper
@@ -23,30 +22,43 @@ import com.buge.appmanager.util.SnackbarHelper
 import com.buge.appmanager.viewmodel.PermissionsViewModel
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
-class PermissionsFragment : Fragment() {
-    private var _binding: FragmentPermissionsBinding? = null
+class PermissionDetailFragment : Fragment() {
+    private var _binding: FragmentPermissionDetailBinding? = null
     private val binding get() = _binding!!
     private val viewModel: PermissionsViewModel by viewModels()
     private lateinit var adapter: AppPermissionAdapter
-    private var currentPermissions: List<String> = AppRepository.PERMISSION_MICROPHONE
-    private var currentPermissionLabel: String = ""
+    private var currentPermissions: List<String> = emptyList()
+    private var categoryName: String = ""
+    private var categoryIcon: Int = R.drawable.ic_security
     private var fontApplied = false
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        _binding = FragmentPermissionsBinding.inflate(inflater, container, false)
+        _binding = FragmentPermissionDetailBinding.inflate(inflater, container, false)
         return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        currentPermissionLabel = getString(R.string.perm_microphone)
+
+        // Get arguments
+        arguments?.let {
+            currentPermissions = it.getStringArrayList("permissions") ?: emptyList()
+            categoryName = it.getString("categoryName") ?: "权限"
+            categoryIcon = it.getInt("categoryIcon", R.drawable.ic_security)
+        }
+
+        if (currentPermissions.isEmpty()) {
+            // Fallback to microphone if no permissions specified
+            currentPermissions = listOf("android.permission.RECORD_AUDIO")
+            categoryName = "麦克风"
+        }
 
         setupBackPressedCallback()
+        setupToolbar()
         setupRecyclerView()
-        setupPermissionChips()
         setupBatchActions()
         observeViewModel()
         viewModel.loadAppsForPermissions(currentPermissions)
@@ -74,11 +86,29 @@ class PermissionsFragment : Fragment() {
                     hideBatchActionBar()
                 } else {
                     isEnabled = false
-                    requireActivity().onBackPressedDispatcher.onBackPressed()
+                    // Pop back stack to return to categories
+                    parentFragmentManager.popBackStack()
                 }
             }
         }
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, callback)
+    }
+
+    private fun setupToolbar() {
+        binding.toolbar.setNavigationIcon(R.drawable.ic_arrow_back)
+        binding.toolbar.setNavigationOnClickListener {
+            if (adapter.isInSelectionMode()) {
+                adapter.clearSelection()
+                adapter.setSelectionMode(false)
+                hideBatchActionBar()
+            } else {
+                parentFragmentManager.popBackStack()
+            }
+        }
+        binding.toolbar.title = categoryName
+        
+        // Set category icon
+        binding.categoryIcon.setImageResource(categoryIcon)
     }
 
     private fun setupRecyclerView() {
@@ -93,35 +123,6 @@ class PermissionsFragment : Fragment() {
         )
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = adapter
-    }
-
-    private fun setupPermissionChips() {
-        if (!isAdded || view == null) return
-        binding.permissionChipGroup.setOnCheckedStateChangeListener { _, checkedIds ->
-            val (permissions, label) = when {
-                checkedIds.contains(R.id.chip_mic) -> Pair(AppRepository.PERMISSION_MICROPHONE, getString(R.string.perm_microphone))
-                checkedIds.contains(R.id.chip_camera) -> Pair(AppRepository.PERMISSION_CAMERA, getString(R.string.perm_camera))
-                checkedIds.contains(R.id.chip_location) -> Pair(AppRepository.PERMISSION_LOCATION, getString(R.string.perm_location))
-                checkedIds.contains(R.id.chip_contacts) -> Pair(AppRepository.PERMISSION_CONTACTS, getString(R.string.perm_contacts))
-                checkedIds.contains(R.id.chip_storage) -> Pair(AppRepository.PERMISSION_STORAGE, getString(R.string.perm_storage))
-                checkedIds.contains(R.id.chip_manage_storage) -> Pair(AppRepository.PERMISSION_MANAGE_STORAGE, getString(R.string.perm_manage_storage))
-                checkedIds.contains(R.id.chip_phone) -> Pair(AppRepository.PERMISSION_PHONE, getString(R.string.perm_phone))
-                checkedIds.contains(R.id.chip_sms) -> Pair(AppRepository.PERMISSION_SMS, getString(R.string.perm_sms))
-                checkedIds.contains(R.id.chip_calendar) -> Pair(AppRepository.PERMISSION_CALENDAR, getString(R.string.perm_calendar))
-                checkedIds.contains(R.id.chip_sensors) -> Pair(AppRepository.PERMISSION_SENSORS, getString(R.string.perm_body_sensors))
-                checkedIds.contains(R.id.chip_notifications) -> Pair(AppRepository.PERMISSION_NOTIFICATIONS, getString(R.string.perm_notifications))
-                checkedIds.contains(R.id.chip_overlay) -> Pair(AppRepository.PERMISSION_OVERLAY, getString(R.string.perm_overlay))
-                checkedIds.contains(R.id.chip_install_unknown) -> Pair(AppRepository.PERMISSION_INSTALL_UNKNOWN_APPS, getString(R.string.perm_install_unknown))
-                checkedIds.contains(R.id.chip_write_settings) -> Pair(listOf("android.permission.WRITE_SETTINGS"), getString(R.string.perm_write_settings))
-                else -> Pair(AppRepository.PERMISSION_MICROPHONE, getString(R.string.perm_microphone))
-            }
-            currentPermissions = permissions
-            currentPermissionLabel = label
-            adapter.clearSelection()
-            adapter.setSelectionMode(false)
-            hideBatchActionBar()
-            viewModel.loadAppsForPermissions(permissions)
-        }
     }
 
     private fun setupBatchActions() {
