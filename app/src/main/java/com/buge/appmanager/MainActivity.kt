@@ -16,7 +16,8 @@ import androidx.lifecycle.lifecycleScope
 import com.buge.appmanager.databinding.ActivityMainBinding
 import com.buge.appmanager.ui.ActivitiesFragment
 import com.buge.appmanager.ui.AppsFragment
-import com.buge.appmanager.ui.PermissionsFragment
+import com.buge.appmanager.ui.PermissionCategoriesFragment
+import com.buge.appmanager.ui.PermissionDetailFragment
 import com.buge.appmanager.ui.SettingsFragment
 import com.buge.appmanager.util.FontOverrideHelper
 import com.buge.appmanager.util.LocaleManager
@@ -103,6 +104,9 @@ class MainActivity : BaseActivity() {
         if (currentFragment is ActivitiesFragment) {
             (currentFragment as? ActivitiesFragment)?.refresh()
         }
+        if (currentFragment is PermissionCategoriesFragment) {
+            // Refresh if needed
+        }
         applyHideNavLabels()
     }
 
@@ -179,7 +183,7 @@ class MainActivity : BaseActivity() {
                         true
                     }
                     R.id.nav_permissions -> {
-                        loadFragment(PermissionsFragment())
+                        loadFragment(PermissionCategoriesFragment())
                         supportActionBar?.title = getString(R.string.nav_permissions)
                         true
                     }
@@ -220,7 +224,7 @@ class MainActivity : BaseActivity() {
                         true
                     }
                     R.id.nav_permissions -> {
-                        loadFragment(PermissionsFragment())
+                        loadFragment(PermissionCategoriesFragment())
                         supportActionBar?.title = getString(R.string.nav_permissions)
                         true
                     }
@@ -290,7 +294,7 @@ class MainActivity : BaseActivity() {
         val defaultPage = PreferencesManager.getDefaultPage(this)
         val fragment = when (defaultPage) {
             "apps" -> AppsFragment()
-            "permissions" -> PermissionsFragment()
+            "permissions" -> PermissionCategoriesFragment()
             "activities" -> ActivitiesFragment()
             "settings" -> SettingsFragment()
             else -> AppsFragment()
@@ -332,6 +336,21 @@ class MainActivity : BaseActivity() {
         currentFragment = fragment
         supportFragmentManager.beginTransaction()
             .replace(R.id.fragment_container, fragment)
+            .commit()
+    }
+
+    // 用于处理权限详情页的返回导航
+    fun navigateToPermissionDetail(categoryName: String, permissions: List<String>, iconRes: Int) {
+        val detailFragment = PermissionDetailFragment().apply {
+            arguments = Bundle().apply {
+                putStringArrayList("permissions", ArrayList(permissions))
+                putString("categoryName", categoryName)
+                putInt("categoryIcon", iconRes)
+            }
+        }
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, detailFragment)
+            .addToBackStack("permission_detail")
             .commit()
     }
 }
