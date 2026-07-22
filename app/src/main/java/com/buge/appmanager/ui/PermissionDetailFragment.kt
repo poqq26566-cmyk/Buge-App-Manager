@@ -1,9 +1,6 @@
 package com.buge.appmanager.ui
 
-import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
-import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -66,7 +63,7 @@ class PermissionDetailFragment : Fragment() {
             FontOverrideHelper.applyToActivity(activity as BaseActivity)
             fontApplied = true
         }
-        // 从系统设置返回后刷新列表，反映最新授权状态
+        // 从系统设置返回后刷新列表
         if (::adapter.isInitialized) {
             viewModel.loadAppsForPermissions(currentPermissions)
         }
@@ -120,7 +117,6 @@ class PermissionDetailFragment : Fragment() {
     private fun setupBatchActions() {
         if (!isAdded || view == null) return
 
-        // 批量操作：跳转第一个选中应用的该权限设置页
         binding.btnBatchRevoke.setOnClickListener {
             val selected = adapter.getSelectedItems()
             if (selected.isEmpty()) return@setOnClickListener
@@ -128,7 +124,9 @@ class PermissionDetailFragment : Fragment() {
             adapter.clearSelection()
             adapter.setSelectionMode(false)
             hideBatchActionBar()
-            openDirectPermissionSettings(first.app.packageName, first.primaryPermission)
+            AppPermissionAdapter.openPermissionSettings(
+                requireContext(), first.app.packageName, first.primaryPermission
+            )
         }
 
         binding.btnBatchGrant.setOnClickListener {
@@ -138,34 +136,10 @@ class PermissionDetailFragment : Fragment() {
             adapter.clearSelection()
             adapter.setSelectionMode(false)
             hideBatchActionBar()
-            openDirectPermissionSettings(first.app.packageName, first.primaryPermission)
+            AppPermissionAdapter.openPermissionSettings(
+                requireContext(), first.app.packageName, first.primaryPermission
+            )
         }
-    }
-
-    /**
-     * 直接跳转到该应用的指定权限页（如"麦克风权限"页）
-     * 通过读取权限所属权限组来构造 Intent
-     */
-    private fun openDirectPermissionSettings(packageName: String, permission: String) {
-        try {
-            val permInfo = requireContext().packageManager.getPermissionInfo(permission, 0)
-            val groupName = permInfo.group
-            if (groupName != null) {
-                val intent = Intent("android.intent.action.MANAGE_APP_PERMISSION").apply {
-                    putExtra(Intent.EXTRA_PACKAGE_NAME, packageName)
-                    putExtra("android.intent.extra.PERMISSION_GROUP_NAME", groupName)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                startActivity(intent)
-                return
-            }
-        } catch (_: Exception) { }
-        // 回退：跳应用详情页
-        val fallback = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-            data = Uri.fromParts("package", packageName, null)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        startActivity(fallback)
     }
 
     private fun showBatchActionBar() {
