@@ -23,7 +23,7 @@ class PermissionCategoriesFragment : Fragment() {
     private val binding get() = _binding!!
     private var fontApplied = false
 
-    // 使用 PermissionCategory 数据类，注意参数名是 iconResId
+    // 使用项目中已有的图标资源
     private val categories = listOf(
         PermissionCategory(
             id = "mic",
@@ -47,7 +47,7 @@ class PermissionCategoriesFragment : Fragment() {
             id = "contacts",
             displayName = "联系人",
             permissions = AppRepository.PERMISSION_CONTACTS,
-            iconResId = R.drawable.ic_contacts
+            iconResId = R.drawable.ic_security  // 使用已有图标
         ),
         PermissionCategory(
             id = "storage",
@@ -65,43 +65,43 @@ class PermissionCategoriesFragment : Fragment() {
             id = "phone",
             displayName = "电话",
             permissions = AppRepository.PERMISSION_PHONE,
-            iconResId = R.drawable.ic_phone
+            iconResId = R.drawable.ic_phone  // 使用已有图标
         ),
         PermissionCategory(
             id = "sms",
             displayName = "短信",
             permissions = AppRepository.PERMISSION_SMS,
-            iconResId = R.drawable.ic_sms
+            iconResId = R.drawable.ic_sms  // 使用已有图标
         ),
         PermissionCategory(
             id = "calendar",
             displayName = "日历",
             permissions = AppRepository.PERMISSION_CALENDAR,
-            iconResId = R.drawable.ic_calendar
+            iconResId = R.drawable.ic_calendar  // 使用已有图标
         ),
         PermissionCategory(
             id = "sensors",
             displayName = "身体传感器",
             permissions = AppRepository.PERMISSION_SENSORS,
-            iconResId = R.drawable.ic_sensors
+            iconResId = R.drawable.ic_sensors  // 使用已有图标
         ),
         PermissionCategory(
             id = "notifications",
             displayName = "通知",
             permissions = AppRepository.PERMISSION_NOTIFICATIONS,
-            iconResId = R.drawable.ic_notifications
+            iconResId = R.drawable.ic_notifications  // 使用已有图标
         ),
         PermissionCategory(
             id = "overlay",
             displayName = "悬浮窗",
             permissions = AppRepository.PERMISSION_OVERLAY,
-            iconResId = R.drawable.ic_overlay
+            iconResId = R.drawable.ic_overlay  // 使用已有图标
         ),
         PermissionCategory(
             id = "install_unknown",
             displayName = "安装未知应用",
             permissions = AppRepository.PERMISSION_INSTALL_UNKNOWN_APPS,
-            iconResId = R.drawable.ic_install_unknown
+            iconResId = R.drawable.ic_install_unknown  // 使用已有图标
         ),
         PermissionCategory(
             id = "write_settings",
@@ -163,7 +163,6 @@ class PermissionCategoriesFragment : Fragment() {
     private fun navigateToPermissionDetail(category: PermissionCategory) {
         LogManager.info(requireContext(), "Navigating to permission detail", "Category: ${category.displayName}")
         
-        // 使用 MainActivity 的导航方法，或者直接使用 Fragment 事务
         val detailFragment = PermissionDetailFragment().apply {
             arguments = Bundle().apply {
                 putStringArrayList("permissions", ArrayList(category.permissions))
@@ -193,7 +192,6 @@ class PermissionCategoriesFragment : Fragment() {
             holder.bind(items[position])
             holder.itemView.setOnClickListener { onItemClick(items[position]) }
             
-            // Apply corner radius
             val container = holder.itemView.findViewById<View>(R.id.item_container)
             val size = items.size
             val background = when {
