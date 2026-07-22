@@ -4,6 +4,7 @@ import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ArgbEvaluator
 import android.animation.ValueAnimator
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -44,13 +45,9 @@ class AppPermissionAdapter(
         }
     }
 
-    fun isInSelectionMode(): Boolean {
-        return selectionMode
-    }
+    fun isInSelectionMode(): Boolean = selectionMode
 
-    fun getSelectedItems(): List<AppPermissionItem> {
-        return currentList.filter { it.isSelected }
-    }
+    fun getSelectedItems(): List<AppPermissionItem> = currentList.filter { it.isSelected }
 
     fun selectAll() {
         currentList.forEachIndexed { index, item ->
@@ -72,6 +69,32 @@ class AppPermissionAdapter(
         onSelectionChanged(0)
     }
 
+    /**
+     * 直接跳转到该应用的指定权限设置页（如"麦克风权限"页）
+     * 若获取权限组失败则回退到应用详情页
+     */
+    private fun openDirectPermissionSettings(context: Context, packageName: String, permission: String) {
+        try {
+            val permInfo = context.packageManager.getPermissionInfo(permission, 0)
+            val groupName = permInfo.group
+            if (groupName != null) {
+                val intent = Intent("android.intent.action.MANAGE_APP_PERMISSION").apply {
+                    putExtra(Intent.EXTRA_PACKAGE_NAME, packageName)
+                    putExtra("android.intent.extra.PERMISSION_GROUP_NAME", groupName)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+                return
+            }
+        } catch (_: Exception) { }
+        // 回退：跳应用详情页
+        val fallback = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", packageName, null)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(fallback)
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_app_permission, parent, false)
@@ -81,10 +104,8 @@ class AppPermissionAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         holder.bind(getItem(position))
 
-        // Set corner radius based on position
         val container = holder.itemView.findViewById<FrameLayout>(R.id.item_container)
         val size = currentList.size
-
         val background = when {
             size == 1 -> R.drawable.bg_setting_item_single
             position == 0 -> R.drawable.bg_setting_item_top
@@ -93,7 +114,7 @@ class AppPermissionAdapter(
         }
         container.setBackgroundResource(background)
 
-        // CRITICAL: Re-set long click listener every time to ensure it works
+        // 长按进入选择模式
         holder.itemView.setOnLongClickListener(null)
         holder.itemView.setOnLongClickListener {
             if (!selectionMode) {
@@ -108,12 +129,12 @@ class AppPermissionAdapter(
             true
         }
 
-        // Re-set click listener — 非选择模式下点击整行跳转系统设置
+        // 点击行：选择模式下勾选；普通模式下直接跳权限设置页
         holder.itemView.setOnClickListener(null)
         holder.itemView.setOnClickListener {
             holder.animateClick()
+            val item = getItem(holder.adapterPosition)
             if (selectionMode) {
-                val item = getItem(holder.adapterPosition)
                 val newSelected = !item.isSelected
                 item.isSelected = newSelected
                 holder.checkbox.isChecked = newSelected
@@ -122,17 +143,15 @@ class AppPermissionAdapter(
                 onSelectionChanged(count)
                 notifyItemChanged(holder.adapterPosition, "selection")
             } else {
-                // 跳转系统应用权限设置页
-                val item = getItem(holder.adapterPosition)
-                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                    data = Uri.fromParts("package", item.app.packageName, null)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                holder.itemView.context.startActivity(intent)
+                openDirectPermissionSettings(
+                    holder.itemView.context,
+                    item.app.packageName,
+                    item.primaryPermission
+                )
             }
         }
 
-        // Re-set checkbox listener
+        // Checkbox 点击
         holder.checkbox.setOnClickListener(null)
         holder.checkbox.setOnClickListener {
             holder.animateCheckboxClick()
@@ -145,15 +164,15 @@ class AppPermissionAdapter(
             notifyItemChanged(holder.adapterPosition, "selection")
         }
 
-        // chip 点击 → 跳转系统设置
+        // Chip 点击 → 直接跳该权限设置页
         holder.permStatusChip.setOnClickListener(null)
         holder.permStatusChip.setOnClickListener {
             val item = getItem(holder.adapterPosition)
-            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                data = Uri.fromParts("package", item.app.packageName, null)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            holder.itemView.context.startActivity(intent)
+            openDirectPermissionSettings(
+                holder.itemView.context,
+                item.app.packageName,
+                item.primaryPermission
+            )
         }
     }
 
@@ -183,13 +202,8 @@ class AppPermissionAdapter(
             appName.text = item.app.appName
             packageName.text = item.app.packageName
 
-            if (item.app.isSystemApp) {
-                systemAppBadge.visibility = View.VISIBLE
-            } else {
-                systemAppBadge.visibility = View.GONE
-            }
+            systemAppBadge.visibility = if (item.app.isSystemApp) View.VISIBLE else View.GONE
 
-            // Set initial state based on selectionMode
             if (selectionMode) {
                 checkbox.visibility = View.VISIBLE
                 checkbox.alpha = 1f
@@ -233,60 +247,17 @@ class AppPermissionAdapter(
                 checkbox.alpha = 0f
                 checkbox.scaleX = 0.5f
                 checkbox.scaleY = 0.5f
-
-                appIcon.animate()
-                    .translationX(28f)
-                    .setDuration(200)
-                    .setInterpolator(AccelerateDecelerateInterpolator())
-                    .start()
-
-                textContainer.animate()
-                    .translationX(28f)
-                    .setDuration(200)
-                    .setInterpolator(AccelerateDecelerateInterpolator())
-                    .start()
-
-                packageName.animate()
-                    .translationX(28f)
-                    .setDuration(200)
-                    .setInterpolator(AccelerateDecelerateInterpolator())
-                    .start()
-
-                checkbox.animate()
-                    .alpha(1f)
-                    .scaleX(1f)
-                    .scaleY(1f)
-                    .setDuration(180)
-                    .setInterpolator(OvershootInterpolator())
-                    .start()
+                appIcon.animate().translationX(28f).setDuration(200).setInterpolator(AccelerateDecelerateInterpolator()).start()
+                textContainer.animate().translationX(28f).setDuration(200).setInterpolator(AccelerateDecelerateInterpolator()).start()
+                packageName.animate().translationX(28f).setDuration(200).setInterpolator(AccelerateDecelerateInterpolator()).start()
+                checkbox.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(180).setInterpolator(OvershootInterpolator()).start()
             } else {
-                appIcon.animate()
-                    .translationX(0f)
-                    .setDuration(200)
-                    .setInterpolator(AccelerateDecelerateInterpolator())
-                    .start()
-
-                textContainer.animate()
-                    .translationX(0f)
-                    .setDuration(200)
-                    .setInterpolator(AccelerateDecelerateInterpolator())
-                    .start()
-
-                packageName.animate()
-                    .translationX(0f)
-                    .setDuration(200)
-                    .setInterpolator(AccelerateDecelerateInterpolator())
-                    .start()
-
-                checkbox.animate()
-                    .alpha(0f)
-                    .scaleX(0.5f)
-                    .scaleY(0.5f)
-                    .setDuration(150)
-                    .withEndAction {
-                        checkbox.visibility = View.GONE
-                    }
-                    .start()
+                appIcon.animate().translationX(0f).setDuration(200).setInterpolator(AccelerateDecelerateInterpolator()).start()
+                textContainer.animate().translationX(0f).setDuration(200).setInterpolator(AccelerateDecelerateInterpolator()).start()
+                packageName.animate().translationX(0f).setDuration(200).setInterpolator(AccelerateDecelerateInterpolator()).start()
+                checkbox.animate().alpha(0f).scaleX(0.5f).scaleY(0.5f).setDuration(150).withEndAction {
+                    checkbox.visibility = View.GONE
+                }.start()
             }
             checkbox.isChecked = isSelected
         }
@@ -298,97 +269,48 @@ class AppPermissionAdapter(
 
         fun animateCardSelection(selected: Boolean) {
             if (selected) {
-                cardView.animate()
-                    .scaleX(1.02f)
-                    .scaleY(1.02f)
-                    .setDuration(150)
+                cardView.animate().scaleX(1.02f).scaleY(1.02f).setDuration(150)
                     .setInterpolator(OvershootInterpolator())
-                    .withEndAction {
-                        cardView.animate()
-                            .scaleX(1f)
-                            .scaleY(1f)
-                            .setDuration(150)
-                            .start()
-                    }
+                    .withEndAction { cardView.animate().scaleX(1f).scaleY(1f).setDuration(150).start() }
                     .start()
             }
         }
 
         fun animateClick() {
-            cardView.animate()
-                .scaleX(0.98f)
-                .scaleY(0.98f)
-                .setDuration(80)
+            cardView.animate().scaleX(0.98f).scaleY(0.98f).setDuration(80)
                 .setInterpolator(AccelerateDecelerateInterpolator())
-                .withEndAction {
-                    cardView.animate()
-                        .scaleX(1f)
-                        .scaleY(1f)
-                        .setDuration(80)
-                        .start()
-                }
+                .withEndAction { cardView.animate().scaleX(1f).scaleY(1f).setDuration(80).start() }
                 .start()
         }
 
         fun animateCheckbox(checked: Boolean) {
             if (checked) {
-                checkbox.animate()
-                    .scaleX(1.2f)
-                    .scaleY(1.2f)
-                    .setDuration(100)
+                checkbox.animate().scaleX(1.2f).scaleY(1.2f).setDuration(100)
                     .setInterpolator(OvershootInterpolator())
-                    .withEndAction {
-                        checkbox.animate()
-                            .scaleX(1f)
-                            .scaleY(1f)
-                            .setDuration(100)
-                            .start()
-                    }
+                    .withEndAction { checkbox.animate().scaleX(1f).scaleY(1f).setDuration(100).start() }
                     .start()
             }
         }
 
         fun animateCheckboxClick() {
-            checkbox.animate()
-                .scaleX(1.15f)
-                .scaleY(1.15f)
-                .setDuration(80)
+            checkbox.animate().scaleX(1.15f).scaleY(1.15f).setDuration(80)
                 .setInterpolator(OvershootInterpolator())
-                .withEndAction {
-                    checkbox.animate()
-                        .scaleX(1f)
-                        .scaleY(1f)
-                        .setDuration(80)
-                        .start()
-                }
+                .withEndAction { checkbox.animate().scaleX(1f).scaleY(1f).setDuration(80).start() }
                 .start()
         }
     }
 
     class DiffCallback : DiffUtil.ItemCallback<AppPermissionItem>() {
-        override fun areItemsTheSame(
-            oldItem: AppPermissionItem,
-            newItem: AppPermissionItem
-        ): Boolean {
-            return oldItem.app.packageName == newItem.app.packageName
-        }
+        override fun areItemsTheSame(oldItem: AppPermissionItem, newItem: AppPermissionItem) =
+            oldItem.app.packageName == newItem.app.packageName
 
-        override fun areContentsTheSame(
-            oldItem: AppPermissionItem,
-            newItem: AppPermissionItem
-        ): Boolean {
-            return oldItem.permissionMap.size == newItem.permissionMap.size &&
-                   oldItem.permissionMap.all { (key, value) -> newItem.permissionMap[key] == value } &&
-                   oldItem.isSelected == newItem.isSelected
-        }
+        override fun areContentsTheSame(oldItem: AppPermissionItem, newItem: AppPermissionItem) =
+            oldItem.permissionMap.size == newItem.permissionMap.size &&
+            oldItem.permissionMap.all { (key, value) -> newItem.permissionMap[key] == value } &&
+            oldItem.isSelected == newItem.isSelected
 
-        override fun getChangePayload(
-            oldItem: AppPermissionItem,
-            newItem: AppPermissionItem
-        ): Any? {
-            if (oldItem.isSelected != newItem.isSelected) {
-                return "selection"
-            }
+        override fun getChangePayload(oldItem: AppPermissionItem, newItem: AppPermissionItem): Any? {
+            if (oldItem.isSelected != newItem.isSelected) return "selection"
             return super.getChangePayload(oldItem, newItem)
         }
     }
