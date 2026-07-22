@@ -41,7 +41,6 @@ class PermissionDetailFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Get arguments
         arguments?.let {
             currentPermissions = it.getStringArrayList("permissions") ?: emptyList()
             categoryName = it.getString("categoryName") ?: "权限"
@@ -67,7 +66,7 @@ class PermissionDetailFragment : Fragment() {
             FontOverrideHelper.applyToActivity(activity as BaseActivity)
             fontApplied = true
         }
-        // 从系统设置返回后刷新数据
+        // 从系统设置返回后刷新列表，反映最新授权状态
         if (::adapter.isInitialized) {
             viewModel.loadAppsForPermissions(currentPermissions)
         }
@@ -112,9 +111,7 @@ class PermissionDetailFragment : Fragment() {
     private fun setupRecyclerView() {
         if (!isAdded || view == null) return
         adapter = AppPermissionAdapter(
-            onSelectionChanged = { count ->
-                updateSelectionUI(count)
-            }
+            onSelectionChanged = { count -> updateSelectionUI(count) }
         )
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = adapter
@@ -123,36 +120,52 @@ class PermissionDetailFragment : Fragment() {
     private fun setupBatchActions() {
         if (!isAdded || view == null) return
 
-        // 批量撤销 → 逐个跳转系统设置（跳转第一个被选中的应用）
+        // 批量操作：跳转第一个选中应用的该权限设置页
         binding.btnBatchRevoke.setOnClickListener {
             val selected = adapter.getSelectedItems()
             if (selected.isEmpty()) return@setOnClickListener
+            val first = selected.first()
             adapter.clearSelection()
             adapter.setSelectionMode(false)
             hideBatchActionBar()
-            // 跳转第一个选中应用的系统权限设置
-            val firstPackage = selected.first().app.packageName
-            openSystemPermissionSettings(firstPackage)
+            openDirectPermissionSettings(first.app.packageName, first.primaryPermission)
         }
 
-        // 批量授予 → 跳转系统设置
         binding.btnBatchGrant.setOnClickListener {
             val selected = adapter.getSelectedItems()
             if (selected.isEmpty()) return@setOnClickListener
+            val first = selected.first()
             adapter.clearSelection()
             adapter.setSelectionMode(false)
             hideBatchActionBar()
-            val firstPackage = selected.first().app.packageName
-            openSystemPermissionSettings(firstPackage)
+            openDirectPermissionSettings(first.app.packageName, first.primaryPermission)
         }
     }
 
-    private fun openSystemPermissionSettings(packageName: String) {
-        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+    /**
+     * 直接跳转到该应用的指定权限页（如"麦克风权限"页）
+     * 通过读取权限所属权限组来构造 Intent
+     */
+    private fun openDirectPermissionSettings(packageName: String, permission: String) {
+        try {
+            val permInfo = requireContext().packageManager.getPermissionInfo(permission, 0)
+            val groupName = permInfo.group
+            if (groupName != null) {
+                val intent = Intent("android.intent.action.MANAGE_APP_PERMISSION").apply {
+                    putExtra(Intent.EXTRA_PACKAGE_NAME, packageName)
+                    putExtra("android.intent.extra.PERMISSION_GROUP_NAME", groupName)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(intent)
+                return
+            }
+        } catch (_: Exception) { }
+        // 回退：跳应用详情页
+        val fallback = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
             data = Uri.fromParts("package", packageName, null)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        startActivity(intent)
+        startActivity(fallback)
     }
 
     private fun showBatchActionBar() {
@@ -163,12 +176,8 @@ class PermissionDetailFragment : Fragment() {
             binding.batchActionBar.scaleX = 0.8f
             binding.batchActionBar.scaleY = 0.8f
             binding.batchActionBar.animate()
-                .alpha(1f)
-                .scaleX(1f)
-                .scaleY(1f)
-                .setDuration(250)
-                .setInterpolator(OvershootInterpolator())
-                .start()
+                .alpha(1f).scaleX(1f).scaleY(1f)
+                .setDuration(250).setInterpolator(OvershootInterpolator()).start()
         }
     }
 
@@ -176,16 +185,10 @@ class PermissionDetailFragment : Fragment() {
         if (!isAdded || view == null) return
         if (binding.batchActionBar.visibility == View.VISIBLE) {
             binding.batchActionBar.animate()
-                .alpha(0f)
-                .scaleX(0.8f)
-                .scaleY(0.8f)
-                .setDuration(200)
+                .alpha(0f).scaleX(0.8f).scaleY(0.8f).setDuration(200)
                 .withEndAction {
-                    if (isAdded && view != null) {
-                        binding.batchActionBar.visibility = View.GONE
-                    }
-                }
-                .start()
+                    if (isAdded && view != null) binding.batchActionBar.visibility = View.GONE
+                }.start()
         }
     }
 
@@ -206,15 +209,10 @@ class PermissionDetailFragment : Fragment() {
             if (!isAdded || view == null) return@observe
             val primaryPerm = currentPermissions.firstOrNull() ?: return@observe
             val items = apps.map { (app, permMap) ->
-                AppPermissionItem(
-                    app = app,
-                    permissionMap = permMap,
-                    primaryPermission = primaryPerm
-                )
+                AppPermissionItem(app = app, permissionMap = permMap, primaryPermission = primaryPerm)
             }
             adapter.submitList(items)
             binding.toolbar.subtitle = getString(R.string.apps_count, items.size)
-
             val isEmpty = items.isEmpty()
             binding.emptyState.visibility = if (isEmpty) View.VISIBLE else View.GONE
             binding.recyclerView.visibility = if (isEmpty) View.GONE else View.VISIBLE
@@ -230,9 +228,7 @@ class PermissionDetailFragment : Fragment() {
                 binding.emptyState.visibility = View.GONE
             } else {
                 binding.loadingOverlay.visibility = View.GONE
-                if (hasData) {
-                    binding.recyclerView.visibility = View.VISIBLE
-                }
+                if (hasData) binding.recyclerView.visibility = View.VISIBLE
             }
         }
     }
