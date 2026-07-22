@@ -1,6 +1,9 @@
 package com.buge.appmanager.ui
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -14,13 +17,8 @@ import com.buge.appmanager.R
 import com.buge.appmanager.adapter.AppPermissionAdapter
 import com.buge.appmanager.adapter.AppPermissionItem
 import com.buge.appmanager.databinding.FragmentPermissionDetailBinding
-import com.buge.appmanager.model.AppInfo
-import com.buge.appmanager.shizuku.ShizukuManager
 import com.buge.appmanager.util.FontOverrideHelper
-import com.buge.appmanager.util.PreferencesManager
-import com.buge.appmanager.util.SnackbarHelper
 import com.buge.appmanager.viewmodel.PermissionsViewModel
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 class PermissionDetailFragment : Fragment() {
     private var _binding: FragmentPermissionDetailBinding? = null
@@ -51,7 +49,6 @@ class PermissionDetailFragment : Fragment() {
         }
 
         if (currentPermissions.isEmpty()) {
-            // Fallback to microphone if no permissions specified
             currentPermissions = listOf("android.permission.RECORD_AUDIO")
             categoryName = "麦克风"
         }
@@ -69,6 +66,10 @@ class PermissionDetailFragment : Fragment() {
         if (activity is BaseActivity && !fontApplied) {
             FontOverrideHelper.applyToActivity(activity as BaseActivity)
             fontApplied = true
+        }
+        // 从系统设置返回后刷新数据
+        if (::adapter.isInitialized) {
+            viewModel.loadAppsForPermissions(currentPermissions)
         }
     }
 
@@ -105,16 +106,12 @@ class PermissionDetailFragment : Fragment() {
             }
         }
         binding.toolbar.title = categoryName
-        
         binding.categoryIcon.setImageResource(categoryIcon)
     }
 
     private fun setupRecyclerView() {
         if (!isAdded || view == null) return
         adapter = AppPermissionAdapter(
-            onPermissionToggle = { app, permission, isGranted ->
-                handlePermissionToggle(app, permission, isGranted)
-            },
             onSelectionChanged = { count ->
                 updateSelectionUI(count)
             }
@@ -125,42 +122,37 @@ class PermissionDetailFragment : Fragment() {
 
     private fun setupBatchActions() {
         if (!isAdded || view == null) return
+
+        // 批量撤销 → 逐个跳转系统设置（跳转第一个被选中的应用）
         binding.btnBatchRevoke.setOnClickListener {
             val selected = adapter.getSelectedItems()
             if (selected.isEmpty()) return@setOnClickListener
-            MaterialAlertDialogBuilder(requireContext())
-                .setTitle(R.string.batch_revoke)
-                .setMessage(getString(R.string.confirm_revoke, selected.size))
-                .setPositiveButton(R.string.confirm) { _, _ ->
-                    viewModel.batchRevokePermission(
-                        selected.map { Pair(it.app, it.permissionMap) },
-                        currentPermissions.first()
-                    )
-                    adapter.clearSelection()
-                    adapter.setSelectionMode(false)
-                    hideBatchActionBar()
-                }
-                .setNegativeButton(R.string.cancel, null)
-                .show()
+            adapter.clearSelection()
+            adapter.setSelectionMode(false)
+            hideBatchActionBar()
+            // 跳转第一个选中应用的系统权限设置
+            val firstPackage = selected.first().app.packageName
+            openSystemPermissionSettings(firstPackage)
         }
+
+        // 批量授予 → 跳转系统设置
         binding.btnBatchGrant.setOnClickListener {
             val selected = adapter.getSelectedItems()
             if (selected.isEmpty()) return@setOnClickListener
-            MaterialAlertDialogBuilder(requireContext())
-                .setTitle(R.string.batch_grant)
-                .setMessage(getString(R.string.confirm_grant, selected.size))
-                .setPositiveButton(R.string.confirm) { _, _ ->
-                    viewModel.batchGrantPermission(
-                        selected.map { Pair(it.app, it.permissionMap) },
-                        currentPermissions.first()
-                    )
-                    adapter.clearSelection()
-                    adapter.setSelectionMode(false)
-                    hideBatchActionBar()
-                }
-                .setNegativeButton(R.string.cancel, null)
-                .show()
+            adapter.clearSelection()
+            adapter.setSelectionMode(false)
+            hideBatchActionBar()
+            val firstPackage = selected.first().app.packageName
+            openSystemPermissionSettings(firstPackage)
         }
+    }
+
+    private fun openSystemPermissionSettings(packageName: String) {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", packageName, null)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        startActivity(intent)
     }
 
     private fun showBatchActionBar() {
@@ -195,38 +187,6 @@ class PermissionDetailFragment : Fragment() {
                 }
                 .start()
         }
-    }
-
-    private fun handlePermissionToggle(app: AppInfo, permission: String, isGranted: Boolean) {
-        if (!isAdded || view == null) return
-        if (app.isSystemApp && !PreferencesManager.getAllowSystemOps(requireContext())) {
-            showSystemOpBlockedDialog()
-            return
-        }
-
-        val actionLabel = if (isGranted) getString(R.string.revoke_permission) else getString(R.string.grant_permission)
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle(actionLabel)
-            .setMessage("${app.appName}\n${permission}")
-            .setPositiveButton(R.string.confirm) { _, _ ->
-                if (isGranted) {
-                    viewModel.revokePermission(app.packageName, permission, app.isSystemApp)
-                } else {
-                    viewModel.grantPermission(app.packageName, permission, app.isSystemApp)
-                }
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
-    }
-
-    private fun showSystemOpBlockedDialog() {
-        if (!isAdded || view == null) return
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.system_op_blocked_title)
-            .setMessage(R.string.system_op_blocked_message)
-            .setPositiveButton(R.string.confirm, null)
-            .setNegativeButton(R.string.cancel, null)
-            .show()
     }
 
     private fun updateSelectionUI(count: Int) {
@@ -273,27 +233,6 @@ class PermissionDetailFragment : Fragment() {
                 if (hasData) {
                     binding.recyclerView.visibility = View.VISIBLE
                 }
-            }
-        }
-
-        viewModel.operationResult.observe(viewLifecycleOwner) { result ->
-            if (!isAdded || view == null) return@observe
-            result ?: return@observe
-            val msg = if (result.success) {
-                getString(R.string.operation_success)
-            } else {
-                val errorMsg = result.error.ifEmpty { "Operation failed" }
-                getString(R.string.operation_failed, errorMsg)
-            }
-            SnackbarHelper.showSnackbar(binding.root, msg)
-            viewModel.clearOperationResult()
-        }
-
-        viewModel.systemOpBlocked.observe(viewLifecycleOwner) { blocked ->
-            if (!isAdded || view == null) return@observe
-            if (blocked) {
-                showSystemOpBlockedDialog()
-                viewModel.clearSystemOpBlocked()
             }
         }
     }
