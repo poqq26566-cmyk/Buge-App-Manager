@@ -86,7 +86,6 @@ class PermissionDetailFragment : Fragment() {
                     hideBatchActionBar()
                 } else {
                     isEnabled = false
-                    // Pop back stack to return to categories
                     parentFragmentManager.popBackStack()
                 }
             }
@@ -107,7 +106,6 @@ class PermissionDetailFragment : Fragment() {
         }
         binding.toolbar.title = categoryName
         
-        // Set category icon
         binding.categoryIcon.setImageResource(categoryIcon)
     }
 
@@ -257,7 +255,6 @@ class PermissionDetailFragment : Fragment() {
             adapter.submitList(items)
             binding.toolbar.subtitle = getString(R.string.apps_count, items.size)
 
-            // Show empty state if no apps
             val isEmpty = items.isEmpty()
             binding.emptyState.visibility = if (isEmpty) View.VISIBLE else View.GONE
             binding.recyclerView.visibility = if (isEmpty) View.GONE else View.VISIBLE
