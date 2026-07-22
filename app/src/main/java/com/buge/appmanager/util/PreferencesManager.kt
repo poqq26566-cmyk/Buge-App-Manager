@@ -20,6 +20,7 @@ object PreferencesManager {
     private const val INSTALLER_NAME_KEY = "installer_name"
     private const val UPDATE_METHOD_KEY = "update_method"
     private const val UPDATE_SOURCE_KEY = "update_source"
+    private const val SHIZUKU_PROVIDER_KEY = "shizuku_provider"
 
     private fun getPreferences(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -134,21 +135,8 @@ object PreferencesManager {
         return getPreferences(context).getBoolean(HIDE_NAV_LABELS_KEY, false)
     }
 
-    // Security: Only allow alphanumeric, dots, dashes, underscores, and spaces.
-    // Shell metacharacters are rejected to prevent command injection in UpdateHelper.
-    private val INSTALLER_NAME_REGEX = Regex("""^[a-zA-Z0-9._\- ]*$""")
-
     fun setInstallerName(context: Context, name: String) {
-        val trimmed = name.trim()
-        if (trimmed.isEmpty()) {
-            getPreferences(context).edit().putString(INSTALLER_NAME_KEY, "").apply()
-            return
-        }
-        if (!INSTALLER_NAME_REGEX.matches(trimmed)) {
-            android.util.Log.w("PreferencesManager", "Rejected unsafe installer name: $trimmed")
-            return
-        }
-        getPreferences(context).edit().putString(INSTALLER_NAME_KEY, trimmed).apply()
+        getPreferences(context).edit().putString(INSTALLER_NAME_KEY, name).apply()
     }
 
     fun getInstallerName(context: Context): String {
@@ -169,5 +157,13 @@ object PreferencesManager {
 
     fun getUpdateSource(context: Context): String {
         return getPreferences(context).getString(UPDATE_SOURCE_KEY, "GitHub") ?: "GitHub"
+    }
+
+    fun setShizukuProvider(context: Context, provider: String) {
+        getPreferences(context).edit().putString(SHIZUKU_PROVIDER_KEY, provider).apply()
+    }
+
+    fun getShizukuProvider(context: Context): String {
+        return getPreferences(context).getString(SHIZUKU_PROVIDER_KEY, "moe.shizuku.privileged.api") ?: "moe.shizuku.privileged.api"
     }
 }

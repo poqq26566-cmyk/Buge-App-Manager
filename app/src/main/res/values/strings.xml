@@ -40,6 +40,13 @@
     <string name="pref_google_services_summary">Enable or disable Google Mobile Services</string>
     <string name="pref_google_services_disabled">Google Services not available on this device</string>
 
+    <!-- Shizuku Provider -->
+    <string name="pref_shizuku_provider">Shizuku Provider</string>
+    <string name="pref_shizuku_provider_summary">Customize Shizuku provider package name</string>
+    <string name="shizuku_provider_title">Shizuku Provider Package Name</string>
+    <string name="shizuku_provider_default">moe.shizuku.privileged.api</string>
+    <string name="shizuku_provider_restore_default">Restore Default</string>
+
     <!-- Log Settings -->
     <string name="pref_logging">Logging</string>
     <string name="pref_logging_summary">Record user operations and errors</string>

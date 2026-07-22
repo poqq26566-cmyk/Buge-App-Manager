@@ -20,8 +20,8 @@ import com.buge.appmanager.AppearanceActivity
 import com.buge.appmanager.BaseActivity
 import com.buge.appmanager.CustomLabelsActivity
 import com.buge.appmanager.LogViewerActivity
-import com.buge.appmanager.MainActivity
 import com.buge.appmanager.OptionalPermissionsActivity
+import com.buge.appmanager.MainActivity
 import com.buge.appmanager.R
 import com.buge.appmanager.RestoreAppsActivity
 import com.buge.appmanager.UpdateOptionsActivity
@@ -36,6 +36,7 @@ import com.buge.appmanager.util.SpringAnimationHelper
 import com.buge.appmanager.util.UpdateChecker
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.TextInputEditText
 import kotlinx.coroutines.launch
 import rikka.shizuku.Shizuku
 import java.util.Locale
@@ -89,13 +90,11 @@ class SettingsFragment : Fragment() {
         }
         updateShizukuStatus()
         setupRecyclerView()
-        // Restore scroll position after data is loaded
         restoreScrollPosition()
     }
 
     override fun onPause() {
         super.onPause()
-        // Save scroll position before leaving
         saveScrollPosition()
     }
 
@@ -129,7 +128,6 @@ class SettingsFragment : Fragment() {
         adapter = SettingsAdapter(
             items = items,
             onItemClick = { item ->
-                // Save position before navigating
                 saveScrollPosition()
                 when (item) {
                     is SettingItem.Normal -> {
@@ -155,6 +153,9 @@ class SettingsFragment : Fragment() {
                             }
                             item.title == getString(R.string.pref_optional_permissions) -> {
                                 startActivity(Intent(requireContext(), OptionalPermissionsActivity::class.java))
+                            }
+                            item.title == getString(R.string.pref_shizuku_provider) -> {
+                                showShizukuProviderDialog()
                             }
                         }
                     }
@@ -210,10 +211,39 @@ class SettingsFragment : Fragment() {
         binding.recyclerView.post {
             if (isAdded && view != null) {
                 updateShizukuStatus()
-                // Restore position after adapter is set
                 restoreScrollPosition()
             }
         }
+    }
+
+    private fun showShizukuProviderDialog() {
+        val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_shizuku_provider, null)
+        val inputEditText = dialogView.findViewById<TextInputEditText>(R.id.provider_input)
+
+        val currentProvider = PreferencesManager.getShizukuProvider(requireContext())
+        inputEditText?.setText(currentProvider)
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.shizuku_provider_title)
+            .setView(dialogView)
+            .setPositiveButton(R.string.confirm) { _, _ ->
+                val newProvider = inputEditText?.text?.toString()?.trim() ?: ""
+                if (newProvider.isNotEmpty()) {
+                    PreferencesManager.setShizukuProvider(requireContext(), newProvider)
+                    SnackbarHelper.showSnackbar(binding.root, "Shizuku provider updated")
+                    LogManager.info(requireContext(), "Shizuku provider changed", newProvider)
+                    updateShizukuStatus()
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .setNeutralButton(R.string.shizuku_provider_restore_default) { _, _ ->
+                PreferencesManager.setShizukuProvider(requireContext(), getString(R.string.shizuku_provider_default))
+                inputEditText?.setText(getString(R.string.shizuku_provider_default))
+                SnackbarHelper.showSnackbar(binding.root, "Restored default provider")
+                LogManager.info(requireContext(), "Shizuku provider restored to default")
+                updateShizukuStatus()
+            }
+            .show()
     }
 
     private fun grantStoragePermission() {
@@ -409,6 +439,11 @@ class SettingsFragment : Fragment() {
             SettingItem.SwitchItem(getString(R.string.pref_show_disabled_apps), showDisabledApps, R.drawable.ic_disabled_apps),
             SettingItem.SwitchItem(getString(R.string.pref_show_system_apps), showSystemApps, R.drawable.ic_system_apps),
             SettingItem.SwitchItem(getString(R.string.pref_show_undeclared_activities), showUndeclared, R.drawable.ic_undeclared),
+            SettingItem.Normal(
+                getString(R.string.pref_shizuku_provider),
+                getString(R.string.pref_shizuku_provider_summary),
+                R.drawable.ic_shizuku_icon
+            ),
             SettingItem.Normal(getString(R.string.pref_logging), getString(R.string.pref_logging_summary), R.drawable.ic_log),
             SettingItem.Header(getString(R.string.settings_group_about)),
             SettingItem.About(getVersionName()),
@@ -512,7 +547,8 @@ class SettingsFragment : Fragment() {
 
         btnOpenShizuku.setOnClickListener {
             try {
-                val intent = requireContext().packageManager.getLaunchIntentForPackage("moe.shizuku.privileged.api")
+                val provider = PreferencesManager.getShizukuProvider(requireContext())
+                val intent = requireContext().packageManager.getLaunchIntentForPackage(provider)
                 if (intent != null) {
                     startActivity(intent)
                 } else {
@@ -766,7 +802,6 @@ class SettingsFragment : Fragment() {
             if (isAdded && view != null) {
                 SpringAnimationHelper.animateAlpha(binding.recyclerView, 1f)
                 SpringAnimationHelper.animateTranslationY(binding.recyclerView, 0f)
-                // Restore position after animation
                 restoreScrollPosition()
             }
         }
