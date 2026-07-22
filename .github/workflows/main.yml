@@ -1,0 +1,134 @@
+name: Build Buge App Manager
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'metadata/**'
+      - 'images/**'
+      - '.gitignore'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
+    
+    - name: Setup Gradle
+      uses: gradle/gradle-build-action@v3
+      with:
+        gradle-version: 8.4
+    
+    - name: Make Gradle executable
+      run: chmod +x gradlew
+    
+    - name: Build Release APK
+      run: ./gradlew assembleRelease --no-daemon
+    
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: Buge-App-Manager
+        path: app/build/outputs/apk/release/*.apk
+        retention-days: 30
+    
+    - name: Upload Mapping File
+      uses: actions/upload-artifact@v4
+      with:
+        name: mapping-file
+        path: app/build/outputs/mapping/release/mapping.txt
+        retention-days: 30
+
+  create-release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Download APK artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: Buge-App-Manager
+        path: app/build/outputs/apk/release/
+    
+    - name: Get version from build.gradle.kts
+      id: get_version
+      run: |
+        VERSION_NAME=$(grep 'versionName = ' app/build.gradle.kts | head -1 | sed 's/.*"\(.*\)".*/\1/')
+        VERSION_CODE=$(grep 'versionCode = ' app/build.gradle.kts | head -1 | sed 's/.*= \([0-9]*\).*/\1/')
+        echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
+        echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
+        echo "APK_NAME=Buge-App-Manager-v$VERSION_NAME.apk" >> $GITHUB_OUTPUT
+    
+    - name: Rename APK
+      run: |
+        cd app/build/outputs/apk/release/
+        mv app-release-unsigned.apk ${{ steps.get_version.outputs.APK_NAME }} || true
+        mv app-release.apk ${{ steps.get_version.outputs.APK_NAME }} || true
+        ls -la
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ steps.get_version.outputs.version_name }}
+        name: Buge App Manager v${{ steps.get_version.outputs.version_name }}
+        body: |
+          ## Buge App Manager v${{ steps.get_version.outputs.version_name }}
+          
+          ### 新增功能 ✨
+          - 重构权限管理器为两级导航结构
+          - 权限页面改为：类别列表 → 点击类别 → 查看该权限下的应用
+          - 添加权限类别图标和更好的视觉层次
+          
+          ### 优化改进 ⚡
+          - 权限管理界面更清晰直观
+          - 批量操作功能保持不变
+          
+          ### 下载
+          - [APK](${{ github.server_url }}/${{ github.repository }}/releases/download/v${{ steps.get_version.outputs.version_name }}/${{ steps.get_version.outputs.APK_NAME }})
+          
+          ---
+          *完整更新日志请查看 Git 提交记录*
+        draft: false
+        prerelease: false
+        files: |
+          app/build/outputs/apk/release/*.apk
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 可选：上传到 Telegram（如果你有 Bot）
+  notify-telegram:
+    needs: create-release
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+    - name: Send notification to Telegram
+      uses: appleboy/telegram-action@master
+      with:
+        to: ${{ secrets.TELEGRAM_CHAT_ID }}
+        token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        message: |
+          🚀 Buge App Manager 新版本已发布！
+          
+          📦 版本: v${{ needs.create-release.outputs.version_name }}
+          📅 时间: ${{ github.event.head_commit.timestamp }}
+          
+          📥 下载: ${{ github.server_url }}/${{ github.repository }}/releases/latest
