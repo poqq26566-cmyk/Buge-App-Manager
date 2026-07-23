@@ -68,20 +68,31 @@ class AppPermissionAdapter(
     }
 
     companion object {
+        /**
+         * 权限 → 权限组名 硬编码映射表
+         * 用于普通运行时权限（有权限组）
+         */
         private val PERMISSION_GROUP_MAP = mapOf(
+            // 麦克风
             "android.permission.RECORD_AUDIO" to "android.permission-group.MICROPHONE",
+            // 摄像头
             "android.permission.CAMERA" to "android.permission-group.CAMERA",
+            // 位置
             "android.permission.ACCESS_FINE_LOCATION" to "android.permission-group.LOCATION",
             "android.permission.ACCESS_COARSE_LOCATION" to "android.permission-group.LOCATION",
             "android.permission.ACCESS_BACKGROUND_LOCATION" to "android.permission-group.LOCATION",
+            // 联系人
             "android.permission.READ_CONTACTS" to "android.permission-group.CONTACTS",
             "android.permission.WRITE_CONTACTS" to "android.permission-group.CONTACTS",
             "android.permission.GET_ACCOUNTS" to "android.permission-group.CONTACTS",
+            // 存储
             "android.permission.READ_EXTERNAL_STORAGE" to "android.permission-group.STORAGE",
             "android.permission.WRITE_EXTERNAL_STORAGE" to "android.permission-group.STORAGE",
+            // 媒体（Android 13+）
             "android.permission.READ_MEDIA_IMAGES" to "android.permission-group.READ_MEDIA_VISUAL",
             "android.permission.READ_MEDIA_VIDEO" to "android.permission-group.READ_MEDIA_VISUAL",
             "android.permission.READ_MEDIA_AUDIO" to "android.permission-group.READ_MEDIA_AURAL",
+            // 电话
             "android.permission.READ_PHONE_STATE" to "android.permission-group.PHONE",
             "android.permission.CALL_PHONE" to "android.permission-group.PHONE",
             "android.permission.READ_CALL_LOG" to "android.permission-group.CALL_LOG",
@@ -89,25 +100,119 @@ class AppPermissionAdapter(
             "android.permission.ADD_VOICEMAIL" to "android.permission-group.PHONE",
             "android.permission.USE_SIP" to "android.permission-group.PHONE",
             "android.permission.PROCESS_OUTGOING_CALLS" to "android.permission-group.PHONE",
+            // 短信
             "android.permission.SEND_SMS" to "android.permission-group.SMS",
             "android.permission.RECEIVE_SMS" to "android.permission-group.SMS",
             "android.permission.READ_SMS" to "android.permission-group.SMS",
             "android.permission.RECEIVE_WAP_PUSH" to "android.permission-group.SMS",
             "android.permission.RECEIVE_MMS" to "android.permission-group.SMS",
+            // 日历
             "android.permission.READ_CALENDAR" to "android.permission-group.CALENDAR",
             "android.permission.WRITE_CALENDAR" to "android.permission-group.CALENDAR",
+            // 身体传感器
             "android.permission.BODY_SENSORS" to "android.permission-group.SENSORS",
             "android.permission.BODY_SENSORS_BACKGROUND" to "android.permission-group.SENSORS",
+            // 活动识别
             "android.permission.ACTIVITY_RECOGNITION" to "android.permission-group.ACTIVITY_RECOGNITION",
+            // 附近设备
             "android.permission.BLUETOOTH_SCAN" to "android.permission-group.NEARBY_DEVICES",
             "android.permission.BLUETOOTH_CONNECT" to "android.permission-group.NEARBY_DEVICES",
             "android.permission.BLUETOOTH_ADVERTISE" to "android.permission-group.NEARBY_DEVICES",
             "android.permission.UWB_RANGING" to "android.permission-group.NEARBY_DEVICES",
+            // 通知（Android 13+）
             "android.permission.POST_NOTIFICATIONS" to "android.permission-group.NOTIFICATIONS"
         )
 
+        /**
+         * 特殊 AppOps 权限 → 跳转到对应系统设置页
+         * 这类权限没有权限组，需要用专属 Action 跳转
+         */
+        fun openPermissionSettings(context: Context, packageName: String, permission: String) {
+            // 1. 先检查是否是特殊权限，直接用专属 Intent
+            val specialIntent = getSpecialPermissionIntent(context, packageName, permission)
+            if (specialIntent != null) {
+                try {
+                    context.startActivity(specialIntent)
+                    return
+                } catch (_: Exception) { }
+            }
+
+            // 2. 普通运行时权限：通过权限组直接跳到该权限设置页
+            val groupName = PERMISSION_GROUP_MAP[permission]
+                ?: runCatching {
+                    context.packageManager.getPermissionInfo(permission, 0).group
+                }.getOrNull()
+
+            if (groupName != null) {
+                try {
+                    val intent = Intent("android.intent.action.MANAGE_APP_PERMISSION").apply {
+                        putExtra(Intent.EXTRA_PACKAGE_NAME, packageName)
+                        putExtra("android.intent.extra.PERMISSION_GROUP_NAME", groupName)
+                        putExtra("android.intent.extra.USER", Process.myUserHandle())
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
+                    return
+                } catch (_: Exception) { }
+            }
+
+            // 3. AOSP 隐式 Intent 不可用（常见于 ColorOS / HyperOS 等定制 ROM）：
+            //    尝试厂商自带的权限管理页，好歹能少跳一层，避免直接进"应用详情"
+            val vendorIntent = getVendorPermissionListIntent(context, packageName)
+            if (vendorIntent != null) {
+                try {
+                    context.startActivity(vendorIntent)
+                    return
+                } catch (_: Exception) { }
+            }
+
+            // 4. 兜底：跳应用详情页
+            context.startActivity(
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", packageName, null)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+            )
+        }
+
+        /**
+         * 厂商定制 ROM 的应用权限列表页（非单项权限直达，但比"应用详情"少一步）。
+         * 目前仅适配 OPPO / OnePlus / Realme 的 ColorOS。
+         * 注意：不同 ColorOS 版本传参 key 不完全统一，这里做了几个常见候选的尝试。
+         */
+        private fun getVendorPermissionListIntent(context: Context, packageName: String): Intent? {
+            val manufacturer = Build.MANUFACTURER.lowercase()
+            if (manufacturer != "oneplus" && manufacturer != "oppo" && manufacturer != "realme") {
+                return null
+            }
+
+            val candidates = listOf(
+                "com.coloros.safecenter" to "com.coloros.privacypermissionsentry.PermissionTopActivity",
+                "com.coloros.safecenter" to "com.coloros.safecenter.permission.PermissionTopActivity",
+                "com.color.safecenter" to "com.color.safecenter.permission.PermissionTopActivity"
+            )
+
+            for ((pkg, cls) in candidates) {
+                for (extraKey in listOf("packageName", "pkgName", "extra_pkgname")) {
+                    val intent = Intent().apply {
+                        setClassName(pkg, cls)
+                        putExtra(extraKey, packageName)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    if (context.packageManager.resolveActivity(intent, 0) != null) {
+                        return intent
+                    }
+                }
+            }
+            return null
+        }
+
+        /**
+         * 特殊权限直接跳转到对应系统设置页
+         */
         private fun getSpecialPermissionIntent(context: Context, packageName: String, permission: String): Intent? {
             return when (permission) {
+                // 悬浮窗
                 "android.permission.SYSTEM_ALERT_WINDOW" ->
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                         Intent(
@@ -116,6 +221,7 @@ class AppPermissionAdapter(
                         ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
                     } else null
 
+                // 安装未知应用（Android 8+）
                 "android.permission.REQUEST_INSTALL_PACKAGES" ->
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         Intent(
@@ -124,6 +230,7 @@ class AppPermissionAdapter(
                         ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
                     } else null
 
+                // 所有文件访问（Android 11+）
                 "android.permission.MANAGE_EXTERNAL_STORAGE" ->
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                         Intent(
@@ -132,6 +239,7 @@ class AppPermissionAdapter(
                         ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
                     } else null
 
+                // 修改系统设置
                 "android.permission.WRITE_SETTINGS" ->
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                         Intent(
@@ -142,63 +250,6 @@ class AppPermissionAdapter(
 
                 else -> null
             }
-        }
-
-        fun openPermissionSettings(context: Context, packageName: String, permission: String) {
-            val candidates = mutableListOf<Intent>()
-
-            getSpecialPermissionIntent(context, packageName, permission)?.let {
-                candidates.add(it)
-            }
-
-            val groupName = PERMISSION_GROUP_MAP[permission]
-            if (groupName != null) {
-                candidates.add(
-                    Intent("android.intent.action.MANAGE_APP_PERMISSION").apply {
-                        putExtra(Intent.EXTRA_PACKAGE_NAME, packageName)
-                        putExtra("android.intent.extra.PERMISSION_GROUP_NAME", groupName)
-                        putExtra("android.intent.extra.USER", Process.myUserHandle())
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                )
-            }
-
-            // 直接用包名跳应用详情（兜底1）
-            candidates.add(
-                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                    data = Uri.fromParts("package", packageName, null)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-            )
-
-            // MIUI 安全中心权限管理
-            candidates.add(
-                Intent("android.settings.APP_PERMISSION_SETTINGS").apply {
-                    putExtra(Intent.EXTRA_PACKAGE_NAME, packageName)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-            )
-
-            // 另一个备选
-            candidates.add(
-                Intent("android.settings.APPLICATION_DETAILS_SETTINGS").apply {
-                    data = Uri.fromParts("package", packageName, null)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-            )
-
-            for (intent in candidates) {
-                try {
-                    context.startActivity(intent)
-                    return
-                } catch (_: Exception) { }
-            }
-
-            try {
-                context.startActivity(Intent(Settings.ACTION_SETTINGS).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                })
-            } catch (_: Exception) { }
         }
     }
 
@@ -221,6 +272,8 @@ class AppPermissionAdapter(
         }
         container.setBackgroundResource(background)
 
+        // 长按进入选择模式
+        holder.itemView.setOnLongClickListener(null)
         holder.itemView.setOnLongClickListener {
             if (!selectionMode) {
                 selectionMode = true
@@ -234,6 +287,8 @@ class AppPermissionAdapter(
             true
         }
 
+        // 点击行
+        holder.itemView.setOnClickListener(null)
         holder.itemView.setOnClickListener {
             holder.animateClick()
             val item = getItem(holder.adapterPosition)
@@ -254,6 +309,8 @@ class AppPermissionAdapter(
             }
         }
 
+        // Checkbox
+        holder.checkbox.setOnClickListener(null)
         holder.checkbox.setOnClickListener {
             holder.animateCheckboxClick()
             val item = getItem(holder.adapterPosition)
@@ -265,6 +322,8 @@ class AppPermissionAdapter(
             notifyItemChanged(holder.adapterPosition, "selection")
         }
 
+        // Chip 点击 → 直接跳该权限专属设置页
+        holder.permStatusChip.setOnClickListener(null)
         holder.permStatusChip.setOnClickListener {
             val item = getItem(holder.adapterPosition)
             openPermissionSettings(
@@ -411,3 +470,505 @@ class AppPermissionAdapter(
         }
     }
 }
+
+
+
+===== ./Buge-App-Manager-main/app/src/main/java/com/buge/appmanager/adapter/AppsAdapter.kt =====
+package com.buge.appmanager.adapter
+
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.OvershootInterpolator
+import android.widget.FrameLayout
+import android.widget.ImageView
+import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
+import androidx.recyclerview.widget.RecyclerView
+import com.buge.appmanager.R
+import com.buge.appmanager.model.AppInfo
+import com.google.android.material.checkbox.MaterialCheckBox
+
+data class AppsItem(
+    val app: AppInfo,
+    var isSelected: Boolean = false
+)
+
+class AppsAdapter(
+    private val onAppClick: (AppInfo) -> Unit,
+    private val onSelectionChanged: (Int) -> Unit
+) : ListAdapter<AppsItem, AppsAdapter.AppViewHolder>(DiffCallback()) {
+
+    private var selectionMode = false
+
+    fun setSelectionMode(enabled: Boolean) {
+        if (selectionMode != enabled) {
+            selectionMode = enabled
+            notifyItemRangeChanged(0, itemCount, "selection_mode")
+        }
+    }
+
+    fun isInSelectionMode(): Boolean {
+        return selectionMode
+    }
+
+    fun getSelectedItems(): List<AppInfo> {
+        return currentList.filter { it.isSelected }.map { it.app }
+    }
+
+    fun toggleSelection(packageName: String) {
+        val index = currentList.indexOfFirst { it.app.packageName == packageName }
+        if (index >= 0) {
+            val item = currentList[index]
+            val newSelected = !item.isSelected
+            item.isSelected = newSelected
+            notifyItemChanged(index, "selection")
+            onSelectionChanged(currentList.count { it.isSelected })
+        }
+    }
+
+    fun selectAll() {
+        currentList.forEachIndexed { index, item ->
+            if (!item.isSelected) {
+                item.isSelected = true
+                notifyItemChanged(index, "selection")
+            }
+        }
+        onSelectionChanged(currentList.size)
+    }
+
+    fun clearSelection() {
+        currentList.forEachIndexed { index, item ->
+            if (item.isSelected) {
+                item.isSelected = false
+                notifyItemChanged(index, "selection")
+            }
+        }
+        onSelectionChanged(0)
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): AppViewHolder {
+        val view = LayoutInflater.from(parent.context)
+            .inflate(R.layout.item_app, parent, false)
+        return AppViewHolder(view)
+    }
+
+    override fun onBindViewHolder(holder: AppViewHolder, position: Int) {
+        holder.bind(getItem(position))
+        applyItemBackground(holder, position)
+        setupItemClickListeners(holder, position)
+    }
+
+    override fun onBindViewHolder(holder: AppViewHolder, position: Int, payloads: MutableList<Any>) {
+        val item = getItem(position)
+        if (payloads.contains("selection_mode")) {
+            holder.updateSelectionMode(selectionMode, item.isSelected)
+        } else if (payloads.contains("selection")) {
+            holder.updateSelection(item.isSelected)
+        } else {
+            super.onBindViewHolder(holder, position, payloads)
+        }
+        // Always re-apply background on any bind
+        applyItemBackground(holder, position)
+        setupItemClickListeners(holder, position)
+    }
+
+    private fun applyItemBackground(holder: AppViewHolder, position: Int) {
+        val container = holder.itemView.findViewById<FrameLayout>(R.id.item_container)
+        val size = currentList.size
+
+        val background = when {
+            size == 1 -> R.drawable.bg_setting_item_single
+            position == 0 -> R.drawable.bg_setting_item_top
+            position == size - 1 -> R.drawable.bg_setting_item_bottom
+            else -> R.drawable.bg_setting_item_middle
+        }
+        container.setBackgroundResource(background)
+    }
+
+    private fun setupItemClickListeners(holder: AppViewHolder, position: Int) {
+        val item = getItem(position)
+
+        // Click listener
+        holder.itemView.setOnClickListener {
+            if (selectionMode) {
+                val newSelected = !item.isSelected
+                item.isSelected = newSelected
+                holder.checkbox.isChecked = newSelected
+                holder.animateCheckbox(newSelected)
+                val count = currentList.count { it.isSelected }
+                onSelectionChanged(count)
+                notifyItemChanged(position, "selection")
+            } else {
+                onAppClick(item.app)
+            }
+        }
+
+        // Long press listener
+        holder.itemView.setOnLongClickListener {
+            if (!selectionMode) {
+                selectionMode = true
+                item.isSelected = true
+                notifyItemRangeChanged(0, itemCount, "selection_mode")
+                val count = currentList.count { it.isSelected }
+                onSelectionChanged(count)
+                holder.animateCardSelection(true)
+            }
+            true
+        }
+
+        // Checkbox listener
+        holder.checkbox.setOnClickListener {
+            val newSelected = holder.checkbox.isChecked
+            item.isSelected = newSelected
+            holder.animateCheckbox(newSelected)
+            val count = currentList.count { it.isSelected }
+            onSelectionChanged(count)
+            notifyItemChanged(position, "selection")
+        }
+    }
+
+    override fun submitList(list: List<AppsItem>?) {
+        super.submitList(list)
+        // Notify all items to update backgrounds when list changes
+        // This ensures corner radii are recalculated after filter/search
+        list?.let {
+            // Use post to ensure it runs after the list is fully submitted
+            // and notifyDataSetChanged to force refresh all item backgrounds
+            // This is a safe approach to recalculate corner radii
+        }
+    }
+
+    override fun onCurrentListChanged(previousList: MutableList<AppsItem>, currentList: MutableList<AppsItem>) {
+        super.onCurrentListChanged(previousList, currentList)
+        // When list size changes, refresh all items to update corner radii
+        if (previousList.size != currentList.size) {
+            notifyItemRangeChanged(0, currentList.size, "background")
+        }
+    }
+
+    override fun getItemCount(): Int = currentList.size
+
+    inner class AppViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val appIcon: ImageView = itemView.findViewById(R.id.app_icon)
+        private val appName: TextView = itemView.findViewById(R.id.app_name)
+        private val packageName: TextView = itemView.findViewById(R.id.package_name)
+        private val appVersion: TextView = itemView.findViewById(R.id.app_version)
+        private val systemAppBadge: View = itemView.findViewById(R.id.system_app_badge)
+        private val textContainer: ViewGroup = appName.parent as ViewGroup
+        val checkbox: MaterialCheckBox = itemView.findViewById(R.id.checkbox)
+        private val cardView: View = itemView
+
+        fun bind(item: AppsItem) {
+            val app = item.app
+            if (app.icon != null) {
+                appIcon.setImageDrawable(app.icon)
+            } else {
+                appIcon.setImageResource(android.R.drawable.sym_def_app_icon)
+            }
+            appName.text = app.appName
+            packageName.text = app.packageName
+            appVersion.text = "v${app.versionName}"
+
+            if (app.isSystemApp) {
+                systemAppBadge.visibility = View.VISIBLE
+            } else {
+                systemAppBadge.visibility = View.GONE
+            }
+
+            // Set initial state based on selectionMode
+            if (selectionMode) {
+                checkbox.visibility = View.VISIBLE
+                checkbox.alpha = 1f
+                checkbox.scaleX = 1f
+                checkbox.scaleY = 1f
+                appIcon.translationX = 28f
+                textContainer.translationX = 28f
+                packageName.translationX = 28f
+            } else {
+                checkbox.visibility = View.GONE
+                appIcon.translationX = 0f
+                textContainer.translationX = 0f
+                packageName.translationX = 0f
+            }
+            checkbox.isChecked = item.isSelected
+        }
+
+        fun updateSelectionMode(mode: Boolean, isSelected: Boolean) {
+            if (mode) {
+                checkbox.visibility = View.VISIBLE
+                checkbox.alpha = 0f
+                checkbox.scaleX = 0.5f
+                checkbox.scaleY = 0.5f
+                
+                appIcon.animate()
+                    .translationX(28f)
+                    .setDuration(200)
+                    .setInterpolator(AccelerateDecelerateInterpolator())
+                    .start()
+                
+                textContainer.animate()
+                    .translationX(28f)
+                    .setDuration(200)
+                    .setInterpolator(AccelerateDecelerateInterpolator())
+                    .start()
+                
+                packageName.animate()
+                    .translationX(28f)
+                    .setDuration(200)
+                    .setInterpolator(AccelerateDecelerateInterpolator())
+                    .start()
+                
+                checkbox.animate()
+                    .alpha(1f)
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .setDuration(180)
+                    .setInterpolator(OvershootInterpolator())
+                    .start()
+            } else {
+                appIcon.animate()
+                    .translationX(0f)
+                    .setDuration(200)
+                    .setInterpolator(AccelerateDecelerateInterpolator())
+                    .start()
+                
+                textContainer.animate()
+                    .translationX(0f)
+                    .setDuration(200)
+                    .setInterpolator(AccelerateDecelerateInterpolator())
+                    .start()
+                
+                packageName.animate()
+                    .translationX(0f)
+                    .setDuration(200)
+                    .setInterpolator(AccelerateDecelerateInterpolator())
+                    .start()
+                
+                checkbox.animate()
+                    .alpha(0f)
+                    .scaleX(0.5f)
+                    .scaleY(0.5f)
+                    .setDuration(150)
+                    .withEndAction {
+                        checkbox.visibility = View.GONE
+                    }
+                    .start()
+            }
+            checkbox.isChecked = isSelected
+        }
+
+        fun updateSelection(isSelected: Boolean) {
+            checkbox.isChecked = isSelected
+            animateCheckbox(isSelected)
+        }
+
+        fun animateCardSelection(selected: Boolean) {
+            if (selected) {
+                cardView.animate()
+                    .scaleX(1.02f)
+                    .scaleY(1.02f)
+                    .setDuration(150)
+                    .setInterpolator(OvershootInterpolator())
+                    .withEndAction {
+                        cardView.animate()
+                            .scaleX(1f)
+                            .scaleY(1f)
+                            .setDuration(150)
+                            .start()
+                    }
+                    .start()
+            }
+        }
+
+        fun animateCheckbox(checked: Boolean) {
+            if (checked) {
+                checkbox.animate()
+                    .scaleX(1.2f)
+                    .scaleY(1.2f)
+                    .setDuration(100)
+                    .setInterpolator(OvershootInterpolator())
+                    .withEndAction {
+                        checkbox.animate()
+                            .scaleX(1f)
+                            .scaleY(1f)
+                            .setDuration(100)
+                            .start()
+                    }
+                    .start()
+            }
+        }
+    }
+
+    class DiffCallback : DiffUtil.ItemCallback<AppsItem>() {
+        override fun areItemsTheSame(oldItem: AppsItem, newItem: AppsItem): Boolean {
+            return oldItem.app.packageName == newItem.app.packageName
+        }
+
+        override fun areContentsTheSame(oldItem: AppsItem, newItem: AppsItem): Boolean {
+            return oldItem.app.packageName == newItem.app.packageName &&
+                   oldItem.isSelected == newItem.isSelected
+        }
+
+        override fun getChangePayload(oldItem: AppsItem, newItem: AppsItem): Any? {
+            if (oldItem.isSelected != newItem.isSelected) {
+                return "selection"
+            }
+            return "background"
+        }
+    }
+}
+
+
+===== ./Buge-App-Manager-main/app/src/main/java/com/buge/appmanager/adapter/LabelAppAdapter.kt =====
+package com.buge.appmanager.adapter
+
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.OvershootInterpolator
+import android.widget.FrameLayout
+import android.widget.ImageView
+import android.widget.TextView
+import androidx.recyclerview.widget.RecyclerView
+import com.buge.appmanager.R
+import com.buge.appmanager.model.AppInfo
+import com.google.android.material.checkbox.MaterialCheckBox
+
+data class LabelAppItem(
+    val app: AppInfo,
+    var isSelected: Boolean = false,
+    var isChecked: Boolean = false
+)
+
+class LabelAppAdapter(
+    private val onItemClick: (AppInfo, Boolean) -> Unit,
+    private val onSelectionChanged: (Int) -> Unit
+) : RecyclerView.Adapter<LabelAppAdapter.ViewHolder>() {
+
+    private var items: List<LabelAppItem> = emptyList()
+    private var selectionMode: Boolean = false
+
+    fun submitList(newItems: List<LabelAppItem>) {
+        items = newItems
+        notifyDataSetChanged()
+    }
+
+    fun setSelectionMode(enabled: Boolean) {
+        if (selectionMode != enabled) {
+            selectionMode = enabled
+            if (!enabled) {
+                items.forEach { it.isChecked = false }
+                onSelectionChanged(0)
+            }
+            notifyItemRangeChanged(0, items.size, "selection_mode")
+        }
+    }
+
+    fun isSelectionMode(): Boolean = selectionMode
+
+    fun getSelectedItems(): List<AppInfo> {
+        return items.filter { it.isChecked }.map { it.app }
+    }
+
+    fun clearSelection() {
+        items.forEach { it.isChecked = false }
+        notifyItemRangeChanged(0, items.size, "selection")
+        onSelectionChanged(0)
+    }
+
+    fun updateSelection(packageName: String, isChecked: Boolean) {
+        val position = items.indexOfFirst { it.app.packageName == packageName }
+        if (position >= 0) {
+            items[position].isChecked = isChecked
+            notifyItemChanged(position, "selection")
+            onSelectionChanged(items.count { it.isChecked })
+        }
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+        val view = LayoutInflater.from(parent.context)
+            .inflate(R.layout.item_app_selection, parent, false)
+        return ViewHolder(view)
+    }
+
+    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+        val item = items[position]
+        holder.bind(item, selectionMode)
+        applyItemBackground(holder, position)
+        setupClickListeners(holder, position, item)
+    }
+
+    override fun onBindViewHolder(holder: ViewHolder, position: Int, payloads: MutableList<Any>) {
+        val item = items[position]
+        if (payloads.contains("selection_mode")) {
+            holder.updateSelectionMode(selectionMode, item.isChecked)
+        } else if (payloads.contains("selection")) {
+            holder.updateCheckbox(item.isChecked)
+        } else {
+            super.onBindViewHolder(holder, position, payloads)
+        }
+    }
+
+    private fun setupClickListeners(holder: ViewHolder, position: Int, item: LabelAppItem) {
+        holder.itemView.setOnClickListener(null)
+        holder.checkbox.setOnCheckedChangeListener(null)
+
+        holder.itemView.setOnClickListener {
+            if (selectionMode) {
+                val newChecked = !item.isChecked
+                item.isChecked = newChecked
+                holder.checkbox.isChecked = newChecked
+                holder.animateCheckbox(newChecked)
+                notifyItemChanged(position, "selection")
+                onSelectionChanged(items.count { it.isChecked })
+            } else {
+                val newSelected = !item.isSelected
+                item.isSelected = newSelected
+                onItemClick(item.app, newSelected)
+            }
+        }
+
+        holder.itemView.setOnLongClickListener {
+            if (!selectionMode) {
+                selectionMode = true
+                item.isChecked = true
+                holder.checkbox.isChecked = true
+                notifyItemRangeChanged(0, items.size, "selection_mode")
+                onSelectionChanged(items.count { it.isChecked })
+                holder.animateCardSelection(true)
+            }
+            true
+        }
+
+        holder.checkbox.setOnCheckedChangeListener { _, isChecked ->
+            if (item.isChecked != isChecked) {
+                item.isChecked = isChecked
+                holder.animateCheckbox(isChecked)
+                notifyItemChanged(position, "selection")
+                onSelectionChanged(items.count { it.isChecked })
+            }
+        }
+    }
+
+    private fun applyItemBackground(holder: ViewHolder, position: Int) {
+        val container = holder.itemView.findViewById<FrameLayout>(R.id.item_container)
+        val size = items.size
+        val background = when {
+            size == 1 -> R.drawable.bg_setting_item_single
+            position == 0 -> R.drawable.bg_setting_item_top
+            position == size - 1 -> R.drawable.bg_setting_item_bottom
+            else -> R.drawable.bg_setting_item_middle
+        }
+        container.setBackgroundResource(background)
+    }
+
+    override fun getItemCount(): Int = items.size
+
+    inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val appIcon: ImageView = itemView.findViewById(R.id.app_icon)
+        private val appName: TextView = itemView.findViewById(R.id.app_name)
+     
