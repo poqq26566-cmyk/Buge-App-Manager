@@ -136,7 +136,7 @@ class AppPermissionAdapter(
                 } catch (_: Exception) { }
             }
 
-            // 2. 尝试厂商自带的权限管理页（针对 ColorOS / OxygenOS 等定制系统的优化）
+            // 2. 优先尝试厂商自带的权限管理页（针对 ColorOS / OxygenOS 等拦截原生 Intent 的 ROM）
             val vendorIntent = getVendorPermissionListIntent(context, packageName)
             if (vendorIntent != null) {
                 try {
@@ -145,7 +145,7 @@ class AppPermissionAdapter(
                 } catch (_: Exception) { }
             }
 
-            // 3. 普通运行时权限：通过权限组直接跳到该权限设置页
+            // 3. 普通运行时权限：通过原生权限组直接跳到该权限设置页
             val groupName = PERMISSION_GROUP_MAP[permission]
                 ?: runCatching {
                     context.packageManager.getPermissionInfo(permission, 0).group
@@ -174,8 +174,8 @@ class AppPermissionAdapter(
         }
 
         /**
-         * 厂商定制 ROM 的应用权限列表页（非单项权限直达，但比"应用详情"少一步）。
-         * 适配 OPPO / OnePlus / Realme（含合并后统一的 OPLUS 品牌壳，ColorOS / OxygenOS 共用同一套底层）。
+         * 厂商定制 ROM 的应用权限列表页
+         * 适配 OPPO / OnePlus / Realme（ColorOS / OxygenOS）
          */
         private fun getVendorPermissionListIntent(context: Context, packageName: String): Intent? {
             val manufacturer = Build.MANUFACTURER.lowercase()
@@ -184,12 +184,12 @@ class AppPermissionAdapter(
             }
 
             val candidates = listOf(
-                // OPLUS 品牌壳（较新版本系统的核心权限设置 Activity）
+                // OPLUS 品牌壳（新版 ColorOS / OxygenOS 核心权限页）
                 "com.oplus.securitypermission" to "com.oplusos.securitypermission.permission.singlepage.AppPermissionsSettingsActivity",
                 "com.oplus.securitypermission" to "com.oplusos.securitypermission.permission.singlepage.PermissionTabActivity",
                 "com.coloros.securitypermission" to "com.coloros.securitypermission.permission.singlepage.AppPermissionsSettingsActivity",
 
-                // ColorOS 老包名
+                // ColorOS 老包名与历史路径
                 "com.coloros.safecenter" to "com.coloros.privacypermissionsentry.PermissionTopActivity",
                 "com.coloros.safecenter" to "com.coloros.safecenter.permission.PermissionTopActivity",
                 "com.color.safecenter" to "com.color.safecenter.permission.PermissionTopActivity",
@@ -199,7 +199,12 @@ class AppPermissionAdapter(
                 "com.oneplus.security" to "com.oneplus.security.permission.PermissionTopActivity"
             )
 
-            val extraKeys = listOf("packageName", "pkgName", "extra_pkgname", "android.intent.extra.PACKAGE_NAME")
+            val extraKeys = listOf(
+                "packageName", 
+                "pkgName", 
+                "extra_pkgname", 
+                "android.intent.extra.PACKAGE_NAME"
+            )
 
             for ((pkg, cls) in candidates) {
                 for (extraKey in extraKeys) {
