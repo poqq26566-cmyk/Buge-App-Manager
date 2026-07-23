@@ -195,9 +195,12 @@ class AppPermissionAdapter(
                 // OnePlus 自有包名（OxygenOS，未完全并入 ColorOS 内核前 / 部分版本）
                 "com.oneplus.security" to "com.oneplus.security.privacypermissionsentry.PermissionTopActivity",
                 "com.oneplus.security" to "com.oneplus.security.permission.PermissionTopActivity",
-                // OPPO/OnePlus/Realme 合并后统一的 OPLUS 品牌壳包名（较新系统版本）
-                "com.oplus.securitypermission" to "com.oplus.securitypermission.permission.PermissionTopActivity",
-                "com.oplusos.securitypermission" to "com.oplusos.securitypermission.permission.PermissionTopActivity"
+                // OPPO/OnePlus/Realme 合并后统一的 OPLUS 品牌壳（较新系统版本）。
+                // 注意：应用包名是 com.oplus.securitypermission，但内部类的完整路径前缀是
+                // com.oplusos.securitypermission（多了个 "os"），是该 ROM 历史遗留的命名不一致，
+                // setClassName 第一个参数必须用包名，第二个参数用类的完整路径，两者不能混用。
+                "com.oplus.securitypermission" to "com.oplusos.securitypermission.permission.singlepage.AppPermissionsSettingsActivity",
+                "com.oplus.securitypermission" to "com.oplusos.securitypermission.permission.singlepage.PermissionTabActivity"
             )
 
             for ((pkg, cls) in candidates) {
@@ -478,7 +481,6 @@ class AppPermissionAdapter(
         }
     }
 }
-
 
 
 
