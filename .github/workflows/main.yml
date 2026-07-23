@@ -55,6 +55,8 @@ jobs:
   create-release:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
     steps:
@@ -132,3 +134,6 @@ jobs:
           📅 时间: ${{ github.event.head_commit.timestamp }}
           
           📥 下载: ${{ github.server_url }}/${{ github.repository }}/releases/latest
+
+
+
