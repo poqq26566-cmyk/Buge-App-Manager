@@ -14,12 +14,14 @@ import android.view.animation.OvershootInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.buge.appmanager.R
 import com.buge.appmanager.model.AppInfo
+import com.buge.appmanager.util.LogManager
 import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.chip.Chip
 
@@ -131,16 +133,27 @@ class AppPermissionAdapter(
         /**
          * 统一入口：根据权限类型选择最精确的跳转方式
          * 优先级：特殊专属页 → 厂商定制页 → 原生权限组页
-         * 所有路径均不兜底跳应用详情，失败则静默返回
+         * 所有路径均不兜底跳应用详情，失败则记日志 + Toast 提示
          */
         fun openPermissionSettings(context: Context, packageName: String, permission: String) {
+            LogManager.info(
+                context, "openPermissionSettings 开始",
+                "pkg=$packageName perm=$permission manufacturer=${Build.MANUFACTURER} model=${Build.MODEL} sdk=${Build.VERSION.SDK_INT}",
+                tag = "PermJump"
+            )
+
             // 1. 特殊权限：直接跳专属系统设置页
             val specialIntent = getSpecialPermissionIntent(context, packageName, permission)
             if (specialIntent != null) {
                 try {
                     context.startActivity(specialIntent)
+                    LogManager.success(context, "步骤1成功: 特殊权限专属页", "$specialIntent", tag = "PermJump")
                     return
-                } catch (_: Exception) { }
+                } catch (e: Exception) {
+                    LogManager.warning(context, "步骤1失败: 特殊权限专属页", "$specialIntent -> ${e}", tag = "PermJump")
+                }
+            } else {
+                LogManager.debug(context, "步骤1跳过: 该权限无专属特殊页", tag = "PermJump")
             }
 
             // 2. 厂商定制 ROM 权限页（ColorOS / OxygenOS 等会拦截原生 Intent 的机型）
@@ -148,8 +161,16 @@ class AppPermissionAdapter(
             if (vendorIntent != null) {
                 try {
                     context.startActivity(vendorIntent)
+                    LogManager.success(context, "步骤2成功: 厂商权限页", "${vendorIntent.component}", tag = "PermJump")
                     return
-                } catch (_: Exception) { }
+                } catch (e: Exception) {
+                    LogManager.warning(context, "步骤2失败: 厂商权限页", "${vendorIntent.component} -> ${e}", tag = "PermJump")
+                }
+            } else {
+                LogManager.warning(
+                    context, "步骤2无候选可用: 厂商权限页一个都没 resolve 成功",
+                    "manufacturer=${Build.MANUFACTURER}，说明候选包名/类名在当前系统版本上已失效", tag = "PermJump"
+                )
             }
 
             // 3. 普通运行时权限：通过权限组直接跳到该权限设置页
@@ -167,11 +188,25 @@ class AppPermissionAdapter(
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     }
                     context.startActivity(intent)
+                    LogManager.success(context, "步骤3成功: 原生 MANAGE_APP_PERMISSION", "group=$groupName", tag = "PermJump")
                     return
-                } catch (_: Exception) { }
+                } catch (e: Exception) {
+                    LogManager.error(
+                        context, "步骤3失败: 原生 MANAGE_APP_PERMISSION",
+                        "group=$groupName -> ${e}", tag = "PermJump", throwable = e
+                    )
+                }
+            } else {
+                LogManager.error(context, "步骤3无法执行: 找不到该权限所属的 permission group", "perm=$permission", tag = "PermJump")
             }
 
-            // 所有路径均失败 → 静默返回，不跳应用详情页
+            // 所有路径均失败 → 不跳应用详情页，仅提示用户去日志页查看原因
+            LogManager.error(context, "全部跳转路径均失败", "pkg=$packageName perm=$permission", tag = "PermJump")
+            Toast.makeText(
+                context,
+                "跳转失败：当前系统不支持直接跳转到该权限设置页，详情见「活动」日志(tag: PermJump)",
+                Toast.LENGTH_LONG
+            ).show()
         }
 
         /**
@@ -334,13 +369,16 @@ class AppPermissionAdapter(
             )
 
             for ((pkg, cls) in candidates) {
-                for (extraKey in extraKeys) {
-                    val intent = Intent().apply {
-                        setClassName(pkg, cls)
-                        putExtra(extraKey, packageName)
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    if (context.packageManager.resolveActivity(intent, 0) != null) {
+                val probe = Intent().apply { setClassName(pkg, cls) }
+                val resolved = context.packageManager.resolveActivity(probe, 0) != null
+                LogManager.debug(context, "厂商候选探测", "$pkg/$cls resolve=$resolved", tag = "PermJump")
+                if (resolved) {
+                    for (extraKey in extraKeys) {
+                        val intent = Intent().apply {
+                            setClassName(pkg, cls)
+                            putExtra(extraKey, packageName)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
                         return intent
                     }
                 }
