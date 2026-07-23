@@ -177,8 +177,9 @@ class AppPermissionAdapter(
 
         /**
          * 厂商定制 ROM 的应用权限列表页（非单项权限直达，但比"应用详情"少一步）。
-         * 目前仅适配 OPPO / OnePlus / Realme 的 ColorOS。
-         * 注意：不同 ColorOS 版本传参 key 不完全统一，这里做了几个常见候选的尝试。
+         * 适配 OPPO / OnePlus / Realme（含合并后统一的 OPLUS 品牌壳，ColorOS / OxygenOS 共用同一套底层）。
+         * 注意：不同 ColorOS/OxygenOS 版本传参 key、包名前缀不完全统一，这里做了几个常见候选的尝试，
+         * 全部通过 resolveActivity 探测，探测不到就静默跳过，不会崩溃。
          */
         private fun getVendorPermissionListIntent(context: Context, packageName: String): Intent? {
             val manufacturer = Build.MANUFACTURER.lowercase()
@@ -187,9 +188,16 @@ class AppPermissionAdapter(
             }
 
             val candidates = listOf(
+                // ColorOS 老包名（OPPO 主线）
                 "com.coloros.safecenter" to "com.coloros.privacypermissionsentry.PermissionTopActivity",
                 "com.coloros.safecenter" to "com.coloros.safecenter.permission.PermissionTopActivity",
-                "com.color.safecenter" to "com.color.safecenter.permission.PermissionTopActivity"
+                "com.color.safecenter" to "com.color.safecenter.permission.PermissionTopActivity",
+                // OnePlus 自有包名（OxygenOS，未完全并入 ColorOS 内核前 / 部分版本）
+                "com.oneplus.security" to "com.oneplus.security.privacypermissionsentry.PermissionTopActivity",
+                "com.oneplus.security" to "com.oneplus.security.permission.PermissionTopActivity",
+                // OPPO/OnePlus/Realme 合并后统一的 OPLUS 品牌壳包名（较新系统版本）
+                "com.oplus.securitypermission" to "com.oplus.securitypermission.permission.PermissionTopActivity",
+                "com.oplusos.securitypermission" to "com.oplusos.securitypermission.permission.PermissionTopActivity"
             )
 
             for ((pkg, cls) in candidates) {
@@ -470,5 +478,7 @@ class AppPermissionAdapter(
         }
     }
 }
+
+
 
 
