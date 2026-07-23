@@ -125,7 +125,6 @@ class AppPermissionAdapter(
 
         /**
          * 特殊 AppOps 权限 → 跳转到对应系统设置页
-         * 这类权限没有权限组，需要用专属 Action 跳转
          */
         fun openPermissionSettings(context: Context, packageName: String, permission: String) {
             // 1. 先检查是否是特殊权限，直接用专属 Intent
@@ -137,7 +136,16 @@ class AppPermissionAdapter(
                 } catch (_: Exception) { }
             }
 
-            // 2. 普通运行时权限：通过权限组直接跳到该权限设置页
+            // 2. 尝试厂商自带的权限管理页（针对 ColorOS / OxygenOS 等定制系统的优化）
+            val vendorIntent = getVendorPermissionListIntent(context, packageName)
+            if (vendorIntent != null) {
+                try {
+                    context.startActivity(vendorIntent)
+                    return
+                } catch (_: Exception) { }
+            }
+
+            // 3. 普通运行时权限：通过权限组直接跳到该权限设置页
             val groupName = PERMISSION_GROUP_MAP[permission]
                 ?: runCatching {
                     context.packageManager.getPermissionInfo(permission, 0).group
@@ -156,16 +164,6 @@ class AppPermissionAdapter(
                 } catch (_: Exception) { }
             }
 
-            // 3. AOSP 隐式 Intent 不可用（常见于 ColorOS / HyperOS 等定制 ROM）：
-            //    尝试厂商自带的权限管理页，好歹能少跳一层，避免直接进"应用详情"
-            val vendorIntent = getVendorPermissionListIntent(context, packageName)
-            if (vendorIntent != null) {
-                try {
-                    context.startActivity(vendorIntent)
-                    return
-                } catch (_: Exception) { }
-            }
-
             // 4. 兜底：跳应用详情页
             context.startActivity(
                 Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
@@ -178,8 +176,6 @@ class AppPermissionAdapter(
         /**
          * 厂商定制 ROM 的应用权限列表页（非单项权限直达，但比"应用详情"少一步）。
          * 适配 OPPO / OnePlus / Realme（含合并后统一的 OPLUS 品牌壳，ColorOS / OxygenOS 共用同一套底层）。
-         * 注意：不同 ColorOS/OxygenOS 版本传参 key、包名前缀不完全统一，这里做了几个常见候选的尝试，
-         * 全部通过 resolveActivity 探测，探测不到就静默跳过，不会崩溃。
          */
         private fun getVendorPermissionListIntent(context: Context, packageName: String): Intent? {
             val manufacturer = Build.MANUFACTURER.lowercase()
@@ -188,23 +184,25 @@ class AppPermissionAdapter(
             }
 
             val candidates = listOf(
-                // ColorOS 老包名（OPPO 主线）
+                // OPLUS 品牌壳（较新版本系统的核心权限设置 Activity）
+                "com.oplus.securitypermission" to "com.oplusos.securitypermission.permission.singlepage.AppPermissionsSettingsActivity",
+                "com.oplus.securitypermission" to "com.oplusos.securitypermission.permission.singlepage.PermissionTabActivity",
+                "com.coloros.securitypermission" to "com.coloros.securitypermission.permission.singlepage.AppPermissionsSettingsActivity",
+
+                // ColorOS 老包名
                 "com.coloros.safecenter" to "com.coloros.privacypermissionsentry.PermissionTopActivity",
                 "com.coloros.safecenter" to "com.coloros.safecenter.permission.PermissionTopActivity",
                 "com.color.safecenter" to "com.color.safecenter.permission.PermissionTopActivity",
-                // OnePlus 自有包名（OxygenOS，未完全并入 ColorOS 内核前 / 部分版本）
+
+                // OnePlus 自有包名
                 "com.oneplus.security" to "com.oneplus.security.privacypermissionsentry.PermissionTopActivity",
-                "com.oneplus.security" to "com.oneplus.security.permission.PermissionTopActivity",
-                // OPPO/OnePlus/Realme 合并后统一的 OPLUS 品牌壳（较新系统版本）。
-                // 注意：应用包名是 com.oplus.securitypermission，但内部类的完整路径前缀是
-                // com.oplusos.securitypermission（多了个 "os"），是该 ROM 历史遗留的命名不一致，
-                // setClassName 第一个参数必须用包名，第二个参数用类的完整路径，两者不能混用。
-                "com.oplus.securitypermission" to "com.oplusos.securitypermission.permission.singlepage.AppPermissionsSettingsActivity",
-                "com.oplus.securitypermission" to "com.oplusos.securitypermission.permission.singlepage.PermissionTabActivity"
+                "com.oneplus.security" to "com.oneplus.security.permission.PermissionTopActivity"
             )
 
+            val extraKeys = listOf("packageName", "pkgName", "extra_pkgname", "android.intent.extra.PACKAGE_NAME")
+
             for ((pkg, cls) in candidates) {
-                for (extraKey in listOf("packageName", "pkgName", "extra_pkgname")) {
+                for (extraKey in extraKeys) {
                     val intent = Intent().apply {
                         setClassName(pkg, cls)
                         putExtra(extraKey, packageName)
@@ -481,6 +479,3 @@ class AppPermissionAdapter(
         }
     }
 }
-
-
-
