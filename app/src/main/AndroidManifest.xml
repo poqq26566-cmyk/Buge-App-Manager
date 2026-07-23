@@ -14,6 +14,25 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
+
+        <!-- 一加 / OPPO / Realme (ColorOS / OxygenOS) 权限管理页 -->
+        <package android:name="com.oplus.securitypermission" />
+        <package android:name="com.coloros.securitypermission" />
+        <package android:name="com.coloros.safecenter" />
+        <package android:name="com.color.safecenter" />
+        <package android:name="com.oneplus.security" />
+
+        <!-- 小米 / Redmi / POCO (MIUI / HyperOS) 权限管理页 -->
+        <package android:name="com.miui.securitycenter" />
+
+        <!-- 华为 / Honor (HarmonyOS / EMUI) 权限管理页 -->
+        <package android:name="com.huawei.systemmanager" />
+
+        <!-- vivo (OriginOS / FuntouchOS) 权限管理页 -->
+        <package android:name="com.vivo.permissionmanager" />
+
+        <!-- 魅族 (Flyme) 权限管理页 -->
+        <package android:name="com.meizu.safe" />
     </queries>
 
     <application
