@@ -199,8 +199,8 @@ class AppRepository(private val context: Context) {
                         appInfo.minSdkVersion
                     } else { 0 }
                     
-                    val apkPath = appInfo
-                                        val apkPath = appInfo.sourceDir ?: ""
+                    
+                    val apkPath = appInfo.sourceDir ?: ""
                     
                     val app = AppInfo(
                         packageName = pkg.packageName,
