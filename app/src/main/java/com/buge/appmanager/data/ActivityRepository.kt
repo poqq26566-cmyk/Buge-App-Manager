@@ -4,7 +4,9 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.drawable.Drawable
 import android.util.Log
+import android.util.LruCache
 import com.buge.appmanager.model.ActivityDetail
 import com.buge.appmanager.model.AppInfo
 import com.buge.appmanager.util.LogManager
@@ -14,8 +16,20 @@ import kotlinx.coroutines.withContext
 class ActivityRepository(private val context: Context) {
     private val pm: PackageManager = context.packageManager
 
+    // ✅ 修复2：添加图标 LRU 缓存，最多缓存150个图标，避免重复加载
+    private val iconCache = LruCache<String, Drawable>(150)
+
     companion object {
         private const val TAG = "ActivityRepository"
+    }
+
+    // ✅ 修复2：统一图标获取方法，优先读缓存
+    private fun getCachedIcon(packageName: String): Drawable? {
+        return iconCache.get(packageName) ?: try {
+            pm.getApplicationIcon(packageName).also { iconCache.put(packageName, it) }
+        } catch (e: Exception) {
+            null
+        }
     }
 
     suspend fun getInstalledAppsWithActivities(showSystemApps: Boolean): List<AppInfo> = withContext(Dispatchers.IO) {
@@ -24,11 +38,12 @@ class ActivityRepository(private val context: Context) {
             
             val allApps = mutableListOf<AppInfo>()
             
+            // ✅ 修复1：一次性带 GET_ACTIVITIES flag 获取所有包信息，彻底消除循环内的重复查询
             val packages = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                pm.getInstalledPackages(PackageManager.PackageInfoFlags.of(0))
+                pm.getInstalledPackages(PackageManager.PackageInfoFlags.of(PackageManager.GET_ACTIVITIES.toLong()))
             } else {
                 @Suppress("DEPRECATION")
-                pm.getInstalledPackages(0)
+                pm.getInstalledPackages(PackageManager.GET_ACTIVITIES)
             }
             
             LogManager.debug(context, "ActivityRepository: Total packages", "${packages.size}")
@@ -36,28 +51,17 @@ class ActivityRepository(private val context: Context) {
             for (pkgInfo in packages) {
                 try {
                     val packageName = pkgInfo.packageName
-                    val appInfo = pm.getApplicationInfo(packageName, 0)
+                    // ✅ 修复1：直接从 pkgInfo 中取 applicationInfo，无需再调用 getApplicationInfo
+                    val appInfo = pkgInfo.applicationInfo ?: continue
                     val isSystem = (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
                     
                     if (!showSystemApps && isSystem) {
                         continue
                     }
                     
-                    // Check if app has any activities - lightweight check
-                    val hasActivities = try {
-                        val packageInfo = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                            pm.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(PackageManager.GET_ACTIVITIES.toLong()))
-                        } else {
-                            @Suppress("DEPRECATION")
-                            pm.getPackageInfo(packageName, PackageManager.GET_ACTIVITIES)
-                        }
-                        val activities = packageInfo?.activities
-                        activities != null && activities.isNotEmpty()
-                    } catch (e: Exception) {
-                        false
-                    }
-                    
-                    if (!hasActivities) {
+                    // ✅ 修复1：直接用 pkgInfo.activities，不再重复调用 getPackageInfo
+                    val activities = pkgInfo.activities
+                    if (activities.isNullOrEmpty()) {
                         continue
                     }
                     
@@ -72,7 +76,8 @@ class ActivityRepository(private val context: Context) {
                                 @Suppress("DEPRECATION")
                                 pkgInfo.versionCode.toLong()
                             },
-                            icon = try { pm.getApplicationIcon(packageName) } catch (e: Exception) { null },
+                            // ✅ 修复2：使用缓存方法加载图标
+                            icon = getCachedIcon(packageName),
                             isSystemApp = isSystem,
                             isEnabled = appInfo.enabled,
                             installTime = pkgInfo.firstInstallTime,
@@ -119,11 +124,8 @@ class ActivityRepository(private val context: Context) {
             
             for (activityInfo in activities) {
                 val className = activityInfo.name
-                // Count intent filters by checking if the activity responds to any intent
                 var intentFilterCount = 0
                 try {
-                    // Use a more efficient approach - just check if there are any intent filters
-                    // without enumerating all of them individually
                     val intent = Intent().apply { 
                         setClassName(packageName, className)
                         action = Intent.ACTION_MAIN
@@ -134,7 +136,6 @@ class ActivityRepository(private val context: Context) {
                         @Suppress("DEPRECATION")
                         pm.queryIntentActivities(intent, 0)
                     }
-                    // If activity can be resolved, it has at least one intent filter
                     intentFilterCount = if (resolveInfoList.isNotEmpty()) 1 else 0
                 } catch (e: Exception) {
                     intentFilterCount = 0
