@@ -5,8 +5,10 @@ import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
+import android.graphics.drawable.Drawable
 import android.os.Build
 import android.util.Log
+import android.util.LruCache
 import com.buge.appmanager.model.AppFilter
 import com.buge.appmanager.model.AppInfo
 import com.buge.appmanager.model.AppSortOrder
@@ -19,22 +21,19 @@ import kotlinx.coroutines.withContext
 class AppRepository(private val context: Context) {
     private val pm: PackageManager = context.packageManager
 
+    // ✅ 修复2：添加图标 LRU 缓存，最多缓存200个图标
+    private val iconCache = LruCache<String, Drawable>(200)
+
     companion object {
         private const val TAG = "AppRepository"
 
-        val PERMISSION_MICROPHONE = listOf(
-            "android.permission.RECORD_AUDIO"
-        )
-        val PERMISSION_CAMERA = listOf(
-            "android.permission.CAMERA"
-        )
+        val PERMISSION_MICROPHONE = listOf("android.permission.RECORD_AUDIO")
+        val PERMISSION_CAMERA = listOf("android.permission.CAMERA")
         val PERMISSION_LOCATION = listOf(
             "android.permission.ACCESS_FINE_LOCATION",
             "android.permission.ACCESS_COARSE_LOCATION"
         )
-        val PERMISSION_BACKGROUND_LOCATION = listOf(
-            "android.permission.ACCESS_BACKGROUND_LOCATION"
-        )
+        val PERMISSION_BACKGROUND_LOCATION = listOf("android.permission.ACCESS_BACKGROUND_LOCATION")
         val PERMISSION_CONTACTS = listOf(
             "android.permission.READ_CONTACTS",
             "android.permission.WRITE_CONTACTS",
@@ -69,39 +68,21 @@ class AppRepository(private val context: Context) {
             "android.permission.BODY_SENSORS",
             "android.permission.BODY_SENSORS_BACKGROUND"
         )
-        val PERMISSION_ACTIVITY = listOf(
-            "android.permission.ACTIVITY_RECOGNITION"
-        )
+        val PERMISSION_ACTIVITY = listOf("android.permission.ACTIVITY_RECOGNITION")
         val PERMISSION_NEARBY = listOf(
             "android.permission.BLUETOOTH_SCAN",
             "android.permission.BLUETOOTH_CONNECT",
             "android.permission.BLUETOOTH_ADVERTISE",
             "android.permission.UWB_RANGING"
         )
-        val PERMISSION_NOTIFICATIONS = listOf(
-            "android.permission.POST_NOTIFICATIONS"
-        )
-        val PERMISSION_MEDIA_IMAGES = listOf(
-            "android.permission.READ_MEDIA_IMAGES"
-        )
-        val PERMISSION_MEDIA_VIDEO = listOf(
-            "android.permission.READ_MEDIA_VIDEO"
-        )
-        val PERMISSION_MEDIA_AUDIO = listOf(
-            "android.permission.READ_MEDIA_AUDIO"
-        )
-        val PERMISSION_OVERLAY = listOf(
-            "android.permission.SYSTEM_ALERT_WINDOW"
-        )
-        val PERMISSION_INSTALL_UNKNOWN_APPS = listOf(
-            "android.permission.REQUEST_INSTALL_PACKAGES"
-        )
-        val PERMISSION_MANAGE_STORAGE = listOf(
-            "android.permission.MANAGE_EXTERNAL_STORAGE"
-        )
-        val PERMISSION_WRITE_SETTINGS = listOf(
-            "android.permission.WRITE_SETTINGS"
-        )
+        val PERMISSION_NOTIFICATIONS = listOf("android.permission.POST_NOTIFICATIONS")
+        val PERMISSION_MEDIA_IMAGES = listOf("android.permission.READ_MEDIA_IMAGES")
+        val PERMISSION_MEDIA_VIDEO = listOf("android.permission.READ_MEDIA_VIDEO")
+        val PERMISSION_MEDIA_AUDIO = listOf("android.permission.READ_MEDIA_AUDIO")
+        val PERMISSION_OVERLAY = listOf("android.permission.SYSTEM_ALERT_WINDOW")
+        val PERMISSION_INSTALL_UNKNOWN_APPS = listOf("android.permission.REQUEST_INSTALL_PACKAGES")
+        val PERMISSION_MANAGE_STORAGE = listOf("android.permission.MANAGE_EXTERNAL_STORAGE")
+        val PERMISSION_WRITE_SETTINGS = listOf("android.permission.WRITE_SETTINGS")
         val ALL_DANGEROUS_PERMISSIONS = (
             PERMISSION_MICROPHONE + PERMISSION_CAMERA + PERMISSION_LOCATION +
             PERMISSION_BACKGROUND_LOCATION + PERMISSION_CONTACTS + PERMISSION_STORAGE +
@@ -117,9 +98,16 @@ class AppRepository(private val context: Context) {
             "android.permission.REQUEST_INSTALL_PACKAGES"
         )
 
-        val APPOP_ONLY_PERMISSIONS = setOf(
-            "android.permission.MANAGE_EXTERNAL_STORAGE"
-        )
+        val APPOP_ONLY_PERMISSIONS = setOf("android.permission.MANAGE_EXTERNAL_STORAGE")
+    }
+
+    // ✅ 修复2：统一图标获取入口，优先读缓存
+    private fun getCachedIcon(packageName: String): Drawable? {
+        return iconCache.get(packageName) ?: try {
+            pm.getApplicationIcon(packageName).also { iconCache.put(packageName, it) }
+        } catch (e: Exception) {
+            null
+        }
     }
 
     private fun getSpecialPermissionStatus(packageName: String, permission: String): Boolean? {
@@ -130,28 +118,20 @@ class AppRepository(private val context: Context) {
                         val appOps = context.getSystemService(AppOpsManager::class.java)
                         val uid = pm.getApplicationInfo(packageName, 0).uid
                         val mode = appOps.checkOpNoThrow(
-                            AppOpsManager.OPSTR_SYSTEM_ALERT_WINDOW,
-                            uid,
-                            packageName
+                            AppOpsManager.OPSTR_SYSTEM_ALERT_WINDOW, uid, packageName
                         )
                         mode == AppOpsManager.MODE_ALLOWED
-                    } else {
-                        true
-                    }
+                    } else { true }
                 }
                 "android.permission.REQUEST_INSTALL_PACKAGES" -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         val appOps = context.getSystemService(AppOpsManager::class.java)
                         val uid = pm.getApplicationInfo(packageName, 0).uid
                         val mode = appOps.checkOpNoThrow(
-                            "android:request_install_packages",
-                            uid,
-                            packageName
+                            "android:request_install_packages", uid, packageName
                         )
                         mode == AppOpsManager.MODE_ALLOWED
-                    } else {
-                        true
-                    }
+                    } else { true }
                 }
                 else -> null
             }
@@ -178,6 +158,7 @@ class AppRepository(private val context: Context) {
         showDisabledApps: Boolean = true
     ): List<AppInfo> = withContext(Dispatchers.IO) {
         try {
+            // ✅ 修复1：flag=0 即可，applicationInfo 已在 PackageInfo 中，无需额外 flag
             val packages: List<PackageInfo> = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 pm.getInstalledPackages(PackageManager.PackageInfoFlags.of(0))
             } else {
@@ -189,6 +170,7 @@ class AppRepository(private val context: Context) {
             
             for (pkg in packages) {
                 try {
+                    // ✅ 修复1：直接用 pkg.applicationInfo，不再单独调用 getApplicationInfo
                     val appInfo = pkg.applicationInfo
                     if (appInfo == null) continue
                     
@@ -209,27 +191,23 @@ class AppRepository(private val context: Context) {
                         pkg.versionCode.toLong()
                     }
                     
-                    val icon = try {
-                        pm.getApplicationIcon(pkg.packageName)
-                    } catch (e: Exception) {
-                        null
-                    }
+                    // ✅ 修复2：使用缓存方法获取图标，第二次以后直接命中缓存
+                    val icon = getCachedIcon(pkg.packageName)
                     
                     val targetSdkVersion = appInfo.targetSdkVersion
                     val minSdkVersion = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                         appInfo.minSdkVersion
-                    } else {
-                        0
-                    }
+                    } else { 0 }
                     
-                    val apkPath = appInfo.sourceDir ?: ""
+                    val apkPath = appInfo
+                                        val apkPath = appInfo.sourceDir ?: ""
                     
                     val app = AppInfo(
                         packageName = pkg.packageName,
                         appName = appName,
                         versionName = versionName,
                         versionCode = versionCode,
-                        icon = icon,
+                        icon = icon,  // ✅ 修复2：已通过 getCachedIcon() 取得，命中缓存则直接返回
                         isSystemApp = isSystem,
                         isEnabled = isEnabled,
                         installTime = pkg.firstInstallTime,
@@ -278,6 +256,7 @@ class AppRepository(private val context: Context) {
         }
     }
 
+    // ✅ 以下所有方法均不改动，保持原样
     suspend fun getAppPermissions(packageName: String): List<PermissionInfo> = withContext(Dispatchers.IO) {
         try {
             val pkgInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -294,7 +273,6 @@ class AppRepository(private val context: Context) {
 
             val permissions = mutableListOf<PermissionInfo>()
 
-            // Check which AppOps permissions are declared in manifest
             val hasWriteSettingsInManifest = requestedPermissions.contains("android.permission.WRITE_SETTINGS")
             val hasOverlayInManifest = requestedPermissions.contains("android.permission.SYSTEM_ALERT_WINDOW")
             val hasInstallUnknownInManifest = requestedPermissions.contains("android.permission.REQUEST_INSTALL_PACKAGES")
@@ -307,9 +285,7 @@ class AppRepository(private val context: Context) {
                     permName == "android.permission.MANAGE_EXTERNAL_STORAGE" -> {
                         if (hasManageStorageInManifest) {
                             getManageExternalStorageStatus(packageName) ?: false
-                        } else {
-                            false
-                        }
+                        } else { false }
                     }
                     permName in APPOP_PERMISSIONS -> {
                         getSpecialPermissionStatus(packageName, permName) ?: false
@@ -323,12 +299,8 @@ class AppRepository(private val context: Context) {
                     val permInfo = @Suppress("DEPRECATION") pm.getPermissionInfo(permName, 0)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                         permInfo.protection == android.content.pm.PermissionInfo.PROTECTION_DANGEROUS
-                    } else {
-                        false
-                    }
-                } catch (e: Exception) {
-                    false
-                }
+                    } else { false }
+                } catch (e: Exception) { false }
 
                 val isSpecial = permName in APPOP_PERMISSIONS
                 val isAppOpOnly = permName in APPOP_ONLY_PERMISSIONS
@@ -473,7 +445,6 @@ class AppRepository(private val context: Context) {
                 val appPermMap = mutableMapOf<String, Boolean>()
                 
                 for (targetPerm in permissions) {
-                    // Check if app has this permission in its manifest
                     val hasInManifest = hasPermissionInManifest(app.packageName, targetPerm)
                     
                     if (hasInManifest) {
@@ -508,9 +479,7 @@ class AppRepository(private val context: Context) {
                                 if (idx >= 0 && idx < permFlags.size) {
                                     getSpecialPermissionStatus(app.packageName, targetPerm)
                                         ?: ((permFlags[idx] and PackageInfo.REQUESTED_PERMISSION_GRANTED) != 0)
-                                } else {
-                                    false
-                                }
+                                } else { false }
                             }
                         }
                         appPermMap[targetPerm] = isGranted
@@ -529,3 +498,4 @@ class AppRepository(private val context: Context) {
         }
     }
 }
+
