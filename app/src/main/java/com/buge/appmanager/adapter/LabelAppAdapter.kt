@@ -8,6 +8,9 @@ import android.view.animation.OvershootInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
+// ✅ 修复3：新增 DiffUtil 和 ListAdapter 相关导入
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.buge.appmanager.R
 import com.buge.appmanager.model.AppInfo
@@ -19,48 +22,62 @@ data class LabelAppItem(
     var isChecked: Boolean = false
 )
 
+// ✅ 修复3：继承 ListAdapter 替代 RecyclerView.Adapter，
+//    内置 DiffUtil 异步差异计算，只刷新真正变化的 item
 class LabelAppAdapter(
     private val onItemClick: (AppInfo, Boolean) -> Unit,
     private val onSelectionChanged: (Int) -> Unit
-) : RecyclerView.Adapter<LabelAppAdapter.ViewHolder>() {
+) : ListAdapter<LabelAppItem, LabelAppAdapter.ViewHolder>(DiffCallback()) {
 
-    private var items: List<LabelAppItem> = emptyList()
+    // ✅ 修复3：DiffCallback 定义，按 packageName 判断是否同一条目
+    class DiffCallback : DiffUtil.ItemCallback<LabelAppItem>() {
+        override fun areItemsTheSame(oldItem: LabelAppItem, newItem: LabelAppItem): Boolean {
+            return oldItem.app.packageName == newItem.app.packageName
+        }
+        override fun areContentsTheSame(oldItem: LabelAppItem, newItem: LabelAppItem): Boolean {
+            return oldItem.app.packageName == newItem.app.packageName &&
+                   oldItem.isSelected == newItem.isSelected &&
+                   oldItem.isChecked == newItem.isChecked
+        }
+    }
+
     private var selectionMode: Boolean = false
 
+    // ✅ 修复3：submitList 改为调用父类 submitList()，
+    //    由 DiffUtil 在后台线程计算差异，仅通知变化的行，不再全量刷新
     fun submitList(newItems: List<LabelAppItem>) {
-        items = newItems
-        notifyDataSetChanged()
+        super.submitList(newItems)
     }
 
     fun setSelectionMode(enabled: Boolean) {
         if (selectionMode != enabled) {
             selectionMode = enabled
             if (!enabled) {
-                items.forEach { it.isChecked = false }
+                currentList.forEach { it.isChecked = false }
                 onSelectionChanged(0)
             }
-            notifyItemRangeChanged(0, items.size, "selection_mode")
+            notifyItemRangeChanged(0, itemCount, "selection_mode")
         }
     }
 
     fun isSelectionMode(): Boolean = selectionMode
 
     fun getSelectedItems(): List<AppInfo> {
-        return items.filter { it.isChecked }.map { it.app }
+        return currentList.filter { it.isChecked }.map { it.app }
     }
 
     fun clearSelection() {
-        items.forEach { it.isChecked = false }
-        notifyItemRangeChanged(0, items.size, "selection")
+        currentList.forEach { it.isChecked = false }
+        notifyItemRangeChanged(0, itemCount, "selection")
         onSelectionChanged(0)
     }
 
     fun updateSelection(packageName: String, isChecked: Boolean) {
-        val position = items.indexOfFirst { it.app.packageName == packageName }
+        val position = currentList.indexOfFirst { it.app.packageName == packageName }
         if (position >= 0) {
-            items[position].isChecked = isChecked
+            currentList[position].isChecked = isChecked
             notifyItemChanged(position, "selection")
-            onSelectionChanged(items.count { it.isChecked })
+            onSelectionChanged(currentList.count { it.isChecked })
         }
     }
 
@@ -71,14 +88,14 @@ class LabelAppAdapter(
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val item = items[position]
+        val item = getItem(position)  // ✅ 修复3：使用 getItem() 替代 items[position]
         holder.bind(item, selectionMode)
         applyItemBackground(holder, position)
         setupClickListeners(holder, position, item)
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int, payloads: MutableList<Any>) {
-        val item = items[position]
+        val item = getItem(position)  // ✅ 修复3：使用 getItem()
         if (payloads.contains("selection_mode")) {
             holder.updateSelectionMode(selectionMode, item.isChecked)
         } else if (payloads.contains("selection")) {
@@ -99,7 +116,7 @@ class LabelAppAdapter(
                 holder.checkbox.isChecked = newChecked
                 holder.animateCheckbox(newChecked)
                 notifyItemChanged(position, "selection")
-                onSelectionChanged(items.count { it.isChecked })
+                onSelectionChanged(currentList.count { it.isChecked })
             } else {
                 val newSelected = !item.isSelected
                 item.isSelected = newSelected
@@ -112,8 +129,8 @@ class LabelAppAdapter(
                 selectionMode = true
                 item.isChecked = true
                 holder.checkbox.isChecked = true
-                notifyItemRangeChanged(0, items.size, "selection_mode")
-                onSelectionChanged(items.count { it.isChecked })
+                notifyItemRangeChanged(0, itemCount, "selection_mode")
+                onSelectionChanged(currentList.count { it.isChecked })
                 holder.animateCardSelection(true)
             }
             true
@@ -124,14 +141,14 @@ class LabelAppAdapter(
                 item.isChecked = isChecked
                 holder.animateCheckbox(isChecked)
                 notifyItemChanged(position, "selection")
-                onSelectionChanged(items.count { it.isChecked })
+                onSelectionChanged(currentList.count { it.isChecked })
             }
         }
     }
 
     private fun applyItemBackground(holder: ViewHolder, position: Int) {
         val container = holder.itemView.findViewById<FrameLayout>(R.id.item_container)
-        val size = items.size
+        val size = itemCount  // ✅ 修复3：使用 itemCount 替代 items.size
         val background = when {
             size == 1 -> R.drawable.bg_setting_item_single
             position == 0 -> R.drawable.bg_setting_item_top
@@ -141,7 +158,7 @@ class LabelAppAdapter(
         container.setBackgroundResource(background)
     }
 
-    override fun getItemCount(): Int = items.size
+    // ✅ 修复3：继承 ListAdapter 后 getItemCount() 由父类自动管理，无需再重写
 
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val appIcon: ImageView = itemView.findViewById(R.id.app_icon)
@@ -187,59 +204,23 @@ class LabelAppAdapter(
                 checkbox.scaleX = 0.5f
                 checkbox.scaleY = 0.5f
 
-                appIcon.animate()
-                    .translationX(28f)
-                    .setDuration(200)
-                    .setInterpolator(AccelerateDecelerateInterpolator())
-                    .start()
-
-                textContainer.animate()
-                    .translationX(28f)
-                    .setDuration(200)
-                    .setInterpolator(AccelerateDecelerateInterpolator())
-                    .start()
-
-                packageName.animate()
-                    .translationX(28f)
-                    .setDuration(200)
-                    .setInterpolator(AccelerateDecelerateInterpolator())
-                    .start()
-
-                checkbox.animate()
-                    .alpha(1f)
-                    .scaleX(1f)
-                    .scaleY(1f)
-                    .setDuration(180)
-                    .setInterpolator(OvershootInterpolator())
-                    .start()
+                appIcon.animate().translationX(28f).setDuration(200)
+                    .setInterpolator(AccelerateDecelerateInterpolator()).start()
+                textContainer.animate().translationX(28f).setDuration(200)
+                    .setInterpolator(AccelerateDecelerateInterpolator()).start()
+                packageName.animate().translationX(28f).setDuration(200)
+                    .setInterpolator(AccelerateDecelerateInterpolator()).start()
+                checkbox.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(180)
+                    .setInterpolator(OvershootInterpolator()).start()
             } else {
-                appIcon.animate()
-                    .translationX(0f)
-                    .setDuration(200)
-                    .setInterpolator(AccelerateDecelerateInterpolator())
-                    .start()
-
-                textContainer.animate()
-                    .translationX(0f)
-                    .setDuration(200)
-                    .setInterpolator(AccelerateDecelerateInterpolator())
-                    .start()
-
-                packageName.animate()
-                    .translationX(0f)
-                    .setDuration(200)
-                    .setInterpolator(AccelerateDecelerateInterpolator())
-                    .start()
-
-                checkbox.animate()
-                    .alpha(0f)
-                    .scaleX(0.5f)
-                    .scaleY(0.5f)
-                    .setDuration(150)
-                    .withEndAction {
-                        checkbox.visibility = View.GONE
-                    }
-                    .start()
+                appIcon.animate().translationX(0f).setDuration(200)
+                    .setInterpolator(AccelerateDecelerateInterpolator()).start()
+                textContainer.animate().translationX(0f).setDuration(200)
+                    .setInterpolator(AccelerateDecelerateInterpolator()).start()
+                packageName.animate().translationX(0f).setDuration(200)
+                    .setInterpolator(AccelerateDecelerateInterpolator()).start()
+                checkbox.animate().alpha(0f).scaleX(0.5f).scaleY(0.5f).setDuration(150)
+                    .withEndAction { checkbox.visibility = View.GONE }.start()
             }
             checkbox.isChecked = isChecked
         }
@@ -250,37 +231,21 @@ class LabelAppAdapter(
 
         fun animateCardSelection(selected: Boolean) {
             if (selected) {
-                cardView.animate()
-                    .scaleX(1.02f)
-                    .scaleY(1.02f)
-                    .setDuration(150)
+                cardView.animate().scaleX(1.02f).scaleY(1.02f).setDuration(150)
                     .setInterpolator(OvershootInterpolator())
                     .withEndAction {
-                        cardView.animate()
-                            .scaleX(1f)
-                            .scaleY(1f)
-                            .setDuration(150)
-                            .start()
-                    }
-                    .start()
+                        cardView.animate().scaleX(1f).scaleY(1f).setDuration(150).start()
+                    }.start()
             }
         }
 
         fun animateCheckbox(checked: Boolean) {
             if (checked) {
-                checkbox.animate()
-                    .scaleX(1.2f)
-                    .scaleY(1.2f)
-                    .setDuration(100)
+                checkbox.animate().scaleX(1.2f).scaleY(1.2f).setDuration(100)
                     .setInterpolator(OvershootInterpolator())
                     .withEndAction {
-                        checkbox.animate()
-                            .scaleX(1f)
-                            .scaleY(1f)
-                            .setDuration(100)
-                            .start()
-                    }
-                    .start()
+                        checkbox.animate().scaleX(1f).scaleY(1f).setDuration(100).start()
+                    }.start()
             }
         }
     }
