@@ -43,11 +43,7 @@ class LabelAppAdapter(
 
     private var selectionMode: Boolean = false
 
-    // ✅ 修复3：submitList 改为调用父类 submitList()，
-    //    由 DiffUtil 在后台线程计算差异，仅通知变化的行，不再全量刷新
-    fun submitList(newItems: List<LabelAppItem>) {
-        super.submitList(newItems)
-    }
+    
 
     fun setSelectionMode(enabled: Boolean) {
         if (selectionMode != enabled) {
